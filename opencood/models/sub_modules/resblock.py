@@ -1,11 +1,13 @@
+from typing import Type, Callable, Union, List, Optional
+
 import torch
-from torch import Tensor
 import torch.nn as nn
-from typing import Type, Any, Callable, Union, List, Optional
+from torch import Tensor
 
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
     """3x3 convolution with padding"""
+    # TODO: 参数 `padding` 和 `dilation` 为什么设置的值是一样的呢?
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=dilation, groups=groups, bias=False, dilation=dilation)
 
@@ -18,17 +20,24 @@ def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
 class BasicBlock(nn.Module):
     expansion: int = 1
 
-    def __init__(
-        self,
-        inplanes: int,
-        planes: int,
-        stride: int = 1,
-        downsample: Optional[nn.Module] = None,
-        groups: int = 1,
-        base_width: int = 64,
-        dilation: int = 1,
-        norm_layer: Optional[Callable[..., nn.Module]] = None
-    ) -> None:
+    def __init__(self, inplanes: int, planes: int, stride: int = 1, downsample: Optional[nn.Module] = None,
+                 groups: int = 1, base_width: int = 64, dilation: int = 1,
+                 norm_layer: Optional[Callable[..., nn.Module]] = None) -> None:
+        """
+
+        Args:
+            inplanes:
+            planes:
+            stride:
+            downsample:
+            groups:
+            base_width:
+            dilation: 卷积扩张率, 默认为 1
+                    在卷积神经网络中，dilation（扩张率或膨胀率）是一个卷积层的参数，
+                    用于控制卷积核（滤波器）在输入特征图上应用时的扩展方式。
+                    具体来说，dilation 指定了卷积核中元素之间的间距，从而影响卷积操作的感受野。
+            norm_layer:
+        """
         super(BasicBlock, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -43,10 +52,10 @@ class BasicBlock(nn.Module):
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
-        self.stride = stride
+        self.stride = stride  # TODO: `stride` 变量并没有在 forward 中用到, 为什么还要定义呢 (也许在类外能用到?)
 
     def forward(self, x: Tensor) -> Tensor:
-        identity = x
+        identity = x  # TODO: 后面直接加 x 就可以, 定义一个新变量 `identity` 是否冗余? 还是说普遍都是这么写的?
 
         out = self.conv1(x)
         out = self.bn1(out)
@@ -58,7 +67,7 @@ class BasicBlock(nn.Module):
         if self.downsample is not None:
             identity = self.downsample(x)
 
-        out += identity
+        out += identity  # TODO: 残差网络的精髓: 残差连接.
         out = self.relu(out)
 
         return out
@@ -71,19 +80,11 @@ class Bottleneck(nn.Module):
     # This variant is also known as ResNet V1.5 and improves accuracy according to
     # https://ngc.nvidia.com/catalog/model-scripts/nvidia:resnet_50_v1_5_for_pytorch.
 
-    expansion: int = 4 # original 4
+    expansion: int = 4  # original 4
 
-    def __init__(
-        self,
-        inplanes: int,
-        planes: int,
-        stride: int = 1,
-        downsample: Optional[nn.Module] = None,
-        groups: int = 1,
-        base_width: int = 64,
-        dilation: int = 1,
-        norm_layer: Optional[Callable[..., nn.Module]] = None
-    ) -> None:
+    def __init__(self, inplanes: int, planes: int, stride: int = 1, downsample: Optional[nn.Module] = None,
+                 groups: int = 1, base_width: int = 64, dilation: int = 1,
+                 norm_layer: Optional[Callable[..., nn.Module]] = None) -> None:
         super(Bottleneck, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -124,19 +125,14 @@ class Bottleneck(nn.Module):
 
 class ResNetModified(nn.Module):
 
-    def __init__(
-        self,
-        block: Type[Union[BasicBlock, Bottleneck]],
-        layers: List[int],  # number of block in one layer
-        layer_strides: List[int],  #  stride after one layer
-        num_filters: List[int],  # feature dim
-        zero_init_residual: bool = False,
-        groups: int = 1,
-        width_per_group: int = 64,
-        replace_stride_with_dilation: Optional[List[bool]] = None,
-        norm_layer: Optional[Callable[..., nn.Module]] = None,
-        inplanes = 64
-    ) -> None:
+    def __init__(self, block: Type[Union[BasicBlock, Bottleneck]],
+                 layers: List[int],  # number of block in one layer
+                 layer_strides: List[int],  # stride after one layer
+                 num_filters: List[int],  # feature dim
+                 zero_init_residual: bool = False, groups: int = 1, width_per_group: int = 64,
+                 replace_stride_with_dilation: Optional[List[bool]] = None,
+                 norm_layer: Optional[Callable[..., nn.Module]] = None,
+                 inplanes=64) -> None:
         super(ResNetModified, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -154,11 +150,12 @@ class ResNetModified(nn.Module):
         self.groups = groups
         self.base_width = width_per_group
 
+        # 创建每一层
         self.layernum = len(num_filters)
         for i in range(self.layernum):
             self.__setattr__(f"layer{i}", self._make_layer(block, num_filters[i], layers[i], stride=layer_strides[i]))
 
-
+        # 权重初始化
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -181,6 +178,7 @@ class ResNetModified(nn.Module):
         norm_layer = self._norm_layer
         downsample = None
         previous_dilation = self.dilation
+        # TODO: 这部分已经看不懂了
         if dilate:
             self.dilation *= stride
             stride = 1
@@ -190,47 +188,43 @@ class ResNetModified(nn.Module):
                 norm_layer(planes * block.expansion),
             )
 
-        layers = []
         # if stride != 1, the first block will downsample the feature map
         # plane is the feature dim
         # if Bottleneck, then the output dim is planes * block.expansion(4)
-        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, norm_layer))
+        layers = [block(self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation,
+                        norm_layer)]
         self.inplanes = planes * block.expansion
+
         for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes, groups=self.groups,
-                                base_width=self.base_width, dilation=self.dilation,
-                                norm_layer=norm_layer))
+            layers.append(block(self.inplanes, planes, groups=self.groups,base_width=self.base_width, dilation=self.dilation,norm_layer=norm_layer))
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor, return_interm: bool = True):
+    def _forward_impl(self, x: Tensor, return_interm: bool = True) -> Union[List[Tensor], Tensor]:
         # See note [TorchScript super()]
         interm_features = []
         for i in range(self.layernum):
+            # 高级, `__init__` 函数中通过 `__setattr__` 函数定义了一系列层这些层的名字是 `layer0`, `layer1`, ...
+            # 如果使用变量来定义的话, 会写很多重复的代码. 这里使用使用 eval 将字符串转换成可执行的 python 代码
             x = eval(f"self.layer{i}")(x)
             interm_features.append(x)
-
+        # 选择性地返回每层的中间特征
         if return_interm:
             return interm_features
         return x
 
-    def forward(self, x: Tensor):
+    def forward(self, x: Tensor) -> Union[List[Tensor], Tensor]:
         return self._forward_impl(x)
 
 
-
-if __name__=="__main__":
+if __name__ == "__main__":
     Bottleneck.expansion = 1
-    model = ResNetModified(Bottleneck, 
-                           layers=[3,4,5],
-                           layer_strides=[1,2,2],
-                           num_filters=[64,128,256],
-                           groups=32, 
-                           width_per_group=4)
-    input = torch.randn(4,64,200,704)
+    model = ResNetModified(Bottleneck, layers=[3, 4, 5], layer_strides=[1, 2, 2],
+                           num_filters=[64, 128, 256], groups=32, width_per_group=4)
+    input = torch.randn(4, 64, 200, 704)
     output = model(input)
     from icecream import ic
+
     for out in output:
         ic(out.shape)
-    print(model)
+    ic(model)

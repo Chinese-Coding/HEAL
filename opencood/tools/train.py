@@ -7,17 +7,20 @@ import os
 import statistics
 
 import torch
-from torch.utils.data import DataLoader, Subset
 from tensorboardX import SummaryWriter
+from torch.utils.data import DataLoader
 
 import opencood.hypes_yaml.yaml_utils as yaml_utils
-from opencood.tools import train_utils
 from opencood.data_utils.datasets import build_dataset
-
-from icecream import ic
+from opencood.tools import train_utils
 
 
 def train_parser():
+    """
+    这段函数可以直接从命令行中读取参数, 而无需传参
+    Returns:
+    解析的命令行参数
+    """
     parser = argparse.ArgumentParser(description="synthetic data generation")
     parser.add_argument("--hypes_yaml", "-y", type=str, required=True,
                         help='data generation yaml file needed ')
@@ -35,9 +38,7 @@ def main():
 
     print('Dataset Building')
     opencood_train_dataset = build_dataset(hypes, visualize=False, train=True)
-    opencood_validate_dataset = build_dataset(hypes,
-                                              visualize=False,
-                                              train=False)
+    opencood_validate_dataset = build_dataset(hypes, visualize=False, train=False)
 
     train_loader = DataLoader(opencood_train_dataset,
                               batch_size=hypes['train_params']['batch_size'],
@@ -59,7 +60,7 @@ def main():
     print('Creating Model')
     model = train_utils.create_model(hypes)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     # record lowest validation loss checkpoint.
     lowest_val_loss = 1e5
     lowest_val_epoch = -1
@@ -70,7 +71,6 @@ def main():
     # optimizer setup
     optimizer = train_utils.setup_optimizer(hypes, model)
     # lr scheduler setup
-    
 
     # if we want to train from last checkpoint.
     if opt.model_dir:
@@ -90,13 +90,14 @@ def main():
     # we assume gpu is necessary
     if torch.cuda.is_available():
         model.to(device)
-        
+
     # record training
     writer = SummaryWriter(saved_path)
 
     print('Training start')
     epoches = hypes['train_params']['epoches']
-    supervise_single_flag = False if not hasattr(opencood_train_dataset, "supervise_single") else opencood_train_dataset.supervise_single
+    supervise_single_flag = False if not hasattr(opencood_train_dataset,
+                                                 "supervise_single") else opencood_train_dataset.supervise_single
     # used to help schedule learning rate
 
     for epoch in range(init_epoch, max(epoches, init_epoch)):
@@ -104,24 +105,25 @@ def main():
             print('learning rate %f' % param_group["lr"])
         # the model will be evaluation mode during validation
         model.train()
-        try: # heter_model stage2
+        try:  # heter_model stage2
             model.model_train_init()
         except:
             print("No model_train_init function")
         for i, batch_data in enumerate(train_loader):
-            if batch_data is None or batch_data['ego']['object_bbx_mask'].sum()==0:
+            if batch_data is None or batch_data['ego']['object_bbx_mask'].sum() == 0:
                 continue
             model.zero_grad()
             optimizer.zero_grad()
             batch_data = train_utils.to_device(batch_data, device)
             batch_data['ego']['epoch'] = epoch
             ouput_dict = model(batch_data['ego'])
-            
+
             final_loss = criterion(ouput_dict, batch_data['ego']['label_dict'])
             criterion.logging(epoch, i, len(train_loader), writer)
 
             if supervise_single_flag:
-                final_loss += criterion(ouput_dict, batch_data['ego']['label_dict_single'], suffix="_single") * hypes['train_params'].get("single_weight", 1)
+                final_loss += criterion(ouput_dict, batch_data['ego']['label_dict_single'], suffix="_single") * hypes[
+                    'train_params'].get("single_weight", 1)
                 criterion.logging(epoch, i, len(train_loader), writer, suffix="_single")
 
             # back-propagation
@@ -164,12 +166,13 @@ def main():
             if valid_ave_loss < lowest_val_loss:
                 lowest_val_loss = valid_ave_loss
                 torch.save(model.state_dict(),
-                       os.path.join(saved_path,
-                                    'net_epoch_bestval_at%d.pth' % (epoch + 1)))
+                           os.path.join(saved_path,
+                                        'net_epoch_bestval_at%d.pth' % (epoch + 1)))
                 if lowest_val_epoch != -1 and os.path.exists(os.path.join(saved_path,
-                                    'net_epoch_bestval_at%d.pth' % (lowest_val_epoch))):
+                                                                          'net_epoch_bestval_at%d.pth' % (
+                                                                                  lowest_val_epoch))):
                     os.remove(os.path.join(saved_path,
-                                    'net_epoch_bestval_at%d.pth' % (lowest_val_epoch)))
+                                           'net_epoch_bestval_at%d.pth' % (lowest_val_epoch)))
                 lowest_val_epoch = epoch + 1
 
         scheduler.step(epoch)
@@ -184,6 +187,7 @@ def main():
         cmd = f"python opencood/tools/inference.py --model_dir {saved_path} --fusion_method {fusion_method}"
         print(f"Running command: {cmd}")
         os.system(cmd)
+
 
 if __name__ == '__main__':
     main()
