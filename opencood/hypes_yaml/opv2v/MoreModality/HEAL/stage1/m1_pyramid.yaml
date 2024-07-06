@@ -5,7 +5,7 @@ test_dir: "dataset/OPV2V/test"
 
 yaml_parser: "load_general_params"
 train_params:
-  batch_size: &batch_size 4
+  batch_size: 4
   epoches: 30
   eval_freq: 2
   save_freq: 2
@@ -19,7 +19,7 @@ cav_lidar_range: &cav_lidar [-102.4, -51.2, -3, 102.4, 51.2, 1]
 
 heter:
   assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
-  ego_modality: &ego_modality "m1"
+  ego_modality: "m1"
   mapping_dict:
     m1: m1
     m2: m1

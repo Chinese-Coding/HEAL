@@ -5,6 +5,7 @@
 import argparse
 import os
 import statistics
+from datetime import datetime
 
 import torch
 from tensorboardX import SummaryWriter
@@ -94,13 +95,15 @@ def main():
     # record training
     writer = SummaryWriter(saved_path)
 
-    print('Training start')
+    print(f'Training start at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    total_start_time = datetime.now()
     epoches = hypes['train_params']['epoches']
     supervise_single_flag = False if not hasattr(opencood_train_dataset,
                                                  "supervise_single") else opencood_train_dataset.supervise_single
     # used to help schedule learning rate
 
     for epoch in range(init_epoch, max(epoches, init_epoch)):
+        epoch_start_time = datetime.now()
         for param_group in optimizer.param_groups:
             print('learning rate %f' % param_group["lr"])
         # the model will be evaluation mode during validation
@@ -133,9 +136,7 @@ def main():
             # torch.cuda.empty_cache()  # it will destroy memory buffer
 
         if epoch % hypes['train_params']['save_freq'] == 0:
-            torch.save(model.state_dict(),
-                       os.path.join(saved_path,
-                                    'net_epoch%d.pth' % (epoch + 1)))
+            torch.save(model.state_dict(), os.path.join(saved_path, 'net_epoch%d.pth' % (epoch + 1)))
 
         if epoch % hypes['train_params']['eval_freq'] == 0:
             valid_ave_loss = []
@@ -179,7 +180,10 @@ def main():
 
         opencood_train_dataset.reinitialize()
 
-    print('Training Finished, checkpoints saved to %s' % saved_path)
+        print(f'Epoch [{epoch}/{epoches}], Train Time: {(datetime.now() - epoch_start_time):.2f} seconds')
+
+    print(f'Training Finished, checkpoints saved to {saved_path} at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    print(f'Total train time: {(datetime.now() - total_start_time):.2f} seconds')
 
     run_test = True
     if run_test:

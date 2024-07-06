@@ -110,6 +110,11 @@ We use spconv 1.2.1 to generate voxel features.
 
 To install spconv 1.2.1, please follow the guide in https://github.com/traveller59/spconv/tree/v1.2.1.
 
+#### Spconv 2.x
+```bash
+pip install spconv-cu113
+```
+
 #### Tips for installing spconv 1.2.1:
 1. make sure your cmake version >= 3.13.2
 2. CUDNN and CUDA runtime library (use `nvcc --version` to check) needs to be installed on your machine.

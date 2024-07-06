@@ -3,13 +3,13 @@
 # Add direction classification loss
 # The originally point_pillar_loss.py, can not determine if the box heading is opposite to the GT.
 
+import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
-from opencood.utils.common_utils import limit_period
+
 from opencood.data_utils.post_processor.voxel_postprocessor import VoxelPostprocessor
-from icecream import ic
+from opencood.utils.common_utils import limit_period
+
 
 class PointPillarLoss(nn.Module):
     def __init__(self, args):
@@ -30,7 +30,7 @@ class PointPillarLoss(nn.Module):
             self.iou = args['iou']
         else:
             self.iou = None
-        
+
         self.loss_dict = {}
 
     def forward(self, output_dict, target_dict, suffix=""):
@@ -47,9 +47,9 @@ class PointPillarLoss(nn.Module):
         else:
             batch_size = target_dict['pos_equal_one'].shape[0]
 
-        cls_labls = target_dict['pos_equal_one'].view(batch_size, -1,  1)
+        cls_labls = target_dict['pos_equal_one'].view(batch_size, -1, 1)
         positives = cls_labls > 0
-        negatives = target_dict['neg_equal_one'].view(batch_size, -1,  1) > 0
+        negatives = target_dict['neg_equal_one'].view(batch_size, -1, 1) > 0
         # cared = torch.logical_or(positives, negatives)
         # cls_labls = cls_labls * cared.type_as(cls_labls)
         # num_normalizer = cared.sum(1, keepdim=True)
@@ -66,8 +66,7 @@ class PointPillarLoss(nn.Module):
         total_loss = 0
 
         # cls loss
-        cls_preds = output_dict[f'cls_preds{suffix}'].permute(0, 2, 3, 1).contiguous() \
-                    .view(batch_size, -1,  1)
+        cls_preds = output_dict[f'cls_preds{suffix}'].permute(0, 2, 3, 1).contiguous().view(batch_size, -1, 1)
         cls_weights = positives * self.pos_cls_weight + negatives * 1.0
         cls_weights /= torch.clamp(pos_normalizer, min=1.0)
         cls_loss = sigmoid_focal_loss(cls_preds, cls_labls, weights=cls_weights, **self.cls)
@@ -81,33 +80,35 @@ class PointPillarLoss(nn.Module):
         reg_loss = weighted_smooth_l1_loss(reg_preds, reg_targets, weights=reg_weights, sigma=self.reg['sigma'])
         reg_loss = reg_loss.sum() * self.reg['weight'] / batch_size
 
-
         ######## direction ##########
         if self.dir:
             dir_targets = self.get_direction_target(target_dict['targets'].view(batch_size, -1, 7))
-            dir_logits = output_dict[f"dir_preds{suffix}"].permute(0, 2, 3, 1).contiguous().view(batch_size, -1, 2) # [N, H*W*#anchor, 2]
+            dir_logits = output_dict[f"dir_preds{suffix}"].permute(0, 2, 3, 1).contiguous().view(batch_size, -1,
+                                                                                                 2)  # [N, H*W*#anchor, 2]
 
-            dir_loss = softmax_cross_entropy_with_logits(dir_logits.view(-1, self.anchor_num), dir_targets.view(-1, self.anchor_num)) 
-            dir_loss = dir_loss.flatten() * reg_weights.flatten() 
+            dir_loss = softmax_cross_entropy_with_logits(dir_logits.view(-1, self.anchor_num),
+                                                         dir_targets.view(-1, self.anchor_num))
+            dir_loss = dir_loss.flatten() * reg_weights.flatten()
             dir_loss = dir_loss.sum() * self.dir['weight'] / batch_size
             total_loss += dir_loss
             self.loss_dict.update({'dir_loss': dir_loss.item()})
 
-
         ######## IoU ###########
         if self.iou:
             iou_preds = output_dict["iou_preds{suffix}"].permute(0, 2, 3, 1).contiguous()
-            pos_pred_mask = reg_weights.squeeze(dim=-1) > 0 # (4, 70400)
+            pos_pred_mask = reg_weights.squeeze(dim=-1) > 0  # (4, 70400)
             iou_pos_preds = iou_preds.view(batch_size, -1)[pos_pred_mask]
-            boxes3d_pred = VoxelPostprocessor.delta_to_boxes3d(output_dict[f'reg_preds{suffix}'].permute(0, 2, 3, 1).contiguous().detach(),
-                                                            output_dict['anchor_box'])[pos_pred_mask]
+            boxes3d_pred = VoxelPostprocessor.delta_to_boxes3d(
+                output_dict[f'reg_preds{suffix}'].permute(0, 2, 3, 1).contiguous().detach(),
+                output_dict['anchor_box'])[pos_pred_mask]
             boxes3d_tgt = VoxelPostprocessor.delta_to_boxes3d(target_dict['targets'],
-                                                            output_dict['anchor_box'])[pos_pred_mask]
+                                                              output_dict['anchor_box'])[pos_pred_mask]
             iou_weights = reg_weights[pos_pred_mask].view(-1)
-            iou_pos_targets = self.iou_loss_func(boxes3d_pred.float()[:, [0, 1, 2, 5, 4, 3, 6]], # hwl -> dx dy dz
-                                                    boxes3d_tgt.float()[:, [0, 1, 2, 5, 4, 3, 6]]).detach().squeeze()
+            iou_pos_targets = self.iou_loss_func(boxes3d_pred.float()[:, [0, 1, 2, 5, 4, 3, 6]],  # hwl -> dx dy dz
+                                                 boxes3d_tgt.float()[:, [0, 1, 2, 5, 4, 3, 6]]).detach().squeeze()
             iou_pos_targets = 2 * iou_pos_targets.view(-1) - 1
-            iou_loss = weighted_smooth_l1_loss(iou_pos_preds, iou_pos_targets, weights=iou_weights, sigma=self.iou['sigma'])
+            iou_loss = weighted_smooth_l1_loss(iou_pos_preds, iou_pos_targets, weights=iou_weights,
+                                               sigma=self.iou['sigma'])
 
             iou_loss = iou_loss.sum() * self.iou['weight'] / batch_size
             total_loss += iou_loss
@@ -121,19 +122,14 @@ class PointPillarLoss(nn.Module):
 
         return total_loss
 
-
     @staticmethod
     def add_sin_difference(boxes1, boxes2, dim=6):
         assert dim != -1
-        rad_pred_encoding = torch.sin(boxes1[..., dim:dim + 1]) * \
-                            torch.cos(boxes2[..., dim:dim + 1])
-        rad_tg_encoding = torch.cos(boxes1[..., dim:dim + 1]) * \
-                          torch.sin(boxes2[..., dim:dim + 1])
+        rad_pred_encoding = torch.sin(boxes1[..., dim:dim + 1]) * torch.cos(boxes2[..., dim:dim + 1])
+        rad_tg_encoding = torch.cos(boxes1[..., dim:dim + 1]) * torch.sin(boxes2[..., dim:dim + 1])
 
-        boxes1 = torch.cat([boxes1[..., :dim], rad_pred_encoding,
-                            boxes1[..., dim + 1:]], dim=-1)
-        boxes2 = torch.cat([boxes2[..., :dim], rad_tg_encoding,
-                            boxes2[..., dim + 1:]], dim=-1)
+        boxes1 = torch.cat([boxes1[..., :dim], rad_pred_encoding, boxes1[..., dim + 1:]], dim=-1)
+        boxes2 = torch.cat([boxes2[..., :dim], rad_tg_encoding, boxes2[..., dim + 1:]], dim=-1)
         return boxes1, boxes2
 
     def get_direction_target(self, reg_targets):
@@ -150,12 +146,13 @@ class PointPillarLoss(nn.Module):
         num_bins = self.dir['args']['num_bins']
         dir_offset = self.dir['args']['dir_offset']
         anchor_yaw = np.deg2rad(np.array(self.dir['args']['anchor_yaw']))  # for direction classification
-        self.anchor_yaw_map = torch.from_numpy(anchor_yaw).view(1,-1,1)  # [1,2,1]
+        self.anchor_yaw_map = torch.from_numpy(anchor_yaw).view(1, -1, 1)  # [1,2,1]
         self.anchor_num = self.anchor_yaw_map.shape[1]
 
         H_times_W_times_anchor_num = reg_targets.shape[1]
-        anchor_map = self.anchor_yaw_map.repeat(1, H_times_W_times_anchor_num//self.anchor_num, 1).to(reg_targets.device) # [1, H * W * #anchor_num, 1]
-        rot_gt = reg_targets[..., -1] + anchor_map[..., -1] # [N, H*W*anchornum]
+        anchor_map = self.anchor_yaw_map.repeat(1, H_times_W_times_anchor_num // self.anchor_num, 1).to(
+            reg_targets.device)  # [1, H * W * #anchor_num, 1]
+        rot_gt = reg_targets[..., -1] + anchor_map[..., -1]  # [N, H*W*anchornum]
         offset_rot = limit_period(rot_gt - dir_offset, 0, 2 * np.pi)
         dir_cls_targets = torch.floor(offset_rot / (2 * np.pi / num_bins)).long()  # [N, H*W*anchornum]
         dir_cls_targets = torch.clamp(dir_cls_targets, min=0, max=num_bins - 1)
@@ -164,9 +161,7 @@ class PointPillarLoss(nn.Module):
         dir_cls_targets = one_hot_f(dir_cls_targets, num_bins)
         return dir_cls_targets
 
-
-
-    def logging(self, epoch, batch_id, batch_len, writer = None, suffix=""):
+    def logging(self, epoch, batch_id, batch_len, writer=None, suffix=""):
         """
         Print out  the loss function for current iteration.
 
@@ -187,26 +182,27 @@ class PointPillarLoss(nn.Module):
         dir_loss = self.loss_dict.get('dir_loss', 0)
         iou_loss = self.loss_dict.get('iou_loss', 0)
 
-
         print("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
               " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f" % (
                   epoch, batch_id + 1, batch_len, suffix,
                   total_loss, cls_loss, reg_loss, dir_loss, iou_loss))
 
         if not writer is None:
-            writer.add_scalar('Regression_loss'+suffix, reg_loss,
-                            epoch*batch_len + batch_id)
-            writer.add_scalar('Confidence_loss'+suffix, cls_loss,
-                            epoch*batch_len + batch_id)
-            writer.add_scalar('Dir_loss'+suffix, dir_loss,
-                            epoch*batch_len + batch_id)
-            writer.add_scalar('Iou_loss'+suffix, iou_loss,
-                            epoch*batch_len + batch_id)
+            writer.add_scalar('Regression_loss' + suffix, reg_loss,
+                              epoch * batch_len + batch_id)
+            writer.add_scalar('Confidence_loss' + suffix, cls_loss,
+                              epoch * batch_len + batch_id)
+            writer.add_scalar('Dir_loss' + suffix, dir_loss,
+                              epoch * batch_len + batch_id)
+            writer.add_scalar('Iou_loss' + suffix, iou_loss,
+                              epoch * batch_len + batch_id)
+
 
 def one_hot_f(tensor, num_bins, dim=-1, on_value=1.0, dtype=torch.float32):
-    tensor_onehot = torch.zeros(*list(tensor.shape), num_bins, dtype=dtype, device=tensor.device) 
-    tensor_onehot.scatter_(dim, tensor.unsqueeze(dim).long(), on_value)                    
+    tensor_onehot = torch.zeros(*list(tensor.shape), num_bins, dtype=dtype, device=tensor.device)
+    tensor_onehot.scatter_(dim, tensor.unsqueeze(dim).long(), on_value)
     return tensor_onehot
+
 
 def softmax_cross_entropy_with_logits(logits, labels):
     param = list(range(len(logits.shape)))
@@ -216,12 +212,13 @@ def softmax_cross_entropy_with_logits(logits, labels):
     loss = loss_ftor(logits, labels.max(dim=-1)[1])
     return loss
 
+
 def weighted_smooth_l1_loss(preds, targets, sigma=3.0, weights=None):
     diff = preds - targets
     abs_diff = torch.abs(diff)
     abs_diff_lt_1 = torch.le(abs_diff, 1 / (sigma ** 2)).type_as(abs_diff)
     loss = abs_diff_lt_1 * 0.5 * torch.pow(abs_diff * sigma, 2) + \
-               (abs_diff - 0.5 / (sigma ** 2)) * (1.0 - abs_diff_lt_1)
+           (abs_diff - 0.5 / (sigma ** 2)) * (1.0 - abs_diff_lt_1)
     if weights is not None:
         loss *= weights
     return loss

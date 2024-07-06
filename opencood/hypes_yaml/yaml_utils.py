@@ -4,6 +4,8 @@
 
 
 import re
+from typing import Union
+
 import yaml
 import os
 import math
@@ -11,7 +13,7 @@ import math
 import numpy as np
 
 
-def load_yaml(file, opt=None):
+def load_yaml(file: Union[str, None], opt=None):
     """
     Load yaml file and return a dictionary.
 
@@ -87,7 +89,7 @@ def load_voxel_params(param):
         param['model']['args']['W'] = anchor_args['W']
         param['model']['args']['H'] = anchor_args['H']
         param['model']['args']['D'] = anchor_args['D']
-    
+
     if 'box_align_pre_calc' in param:
         param['box_align_pre_calc']['stage1_postprocessor_config'].update({'anchor_args': anchor_args})
 
@@ -128,8 +130,9 @@ def load_point_pillar_params(param):
     anchor_args['vh'] = vh
     anchor_args['vd'] = vd
 
-    anchor_args['W'] = math.ceil((cav_lidar_range[3] - cav_lidar_range[0]) / vw) # W is image width, but along with x axis in lidar coordinate
-    anchor_args['H'] = math.ceil((cav_lidar_range[4] - cav_lidar_range[1]) / vh) # H is image height
+    anchor_args['W'] = math.ceil(
+        (cav_lidar_range[3] - cav_lidar_range[0]) / vw)  # W is image width, but along with x axis in lidar coordinate
+    anchor_args['H'] = math.ceil((cav_lidar_range[4] - cav_lidar_range[1]) / vh)  # H is image height
     anchor_args['D'] = math.ceil((cav_lidar_range[5] - cav_lidar_range[2]) / vd)
 
     param['postprocess'].update({'anchor_args': anchor_args})
@@ -248,7 +251,6 @@ def save_yaml(data, save_name):
         yaml.dump(data, outfile, default_flow_style=False)
 
 
-
 def load_point_pillar_params_stage1(param):
     """
     Based on the lidar range and resolution of voxel, calcuate the anchor box
@@ -283,8 +285,9 @@ def load_point_pillar_params_stage1(param):
     anchor_args['vh'] = vh
     anchor_args['vd'] = vd
 
-    anchor_args['W'] = int((cav_lidar_range[3] - cav_lidar_range[0]) / vw) # W is image width, but along with x axis in lidar coordinate
-    anchor_args['H'] = int((cav_lidar_range[4] - cav_lidar_range[1]) / vh) # H is image height
+    anchor_args['W'] = int(
+        (cav_lidar_range[3] - cav_lidar_range[0]) / vw)  # W is image width, but along with x axis in lidar coordinate
+    anchor_args['H'] = int((cav_lidar_range[4] - cav_lidar_range[1]) / vh)  # H is image height
     anchor_args['D'] = int((cav_lidar_range[5] - cav_lidar_range[2]) / vd)
 
     param['box_align_pre_calc']['stage1_postprocessor_config'].update({'anchor_args': anchor_args})
@@ -314,7 +317,7 @@ def load_lift_splat_shoot_params(param):
         cav_lidar_range[0:3])) / \
                 np.array(voxel_size)
     grid_size = np.round(grid_size).astype(np.int64)
-    
+
     anchor_args = param['postprocess']['anchor_args']
 
     vw = voxel_size[0]
@@ -325,8 +328,9 @@ def load_lift_splat_shoot_params(param):
     anchor_args['vh'] = vh
     anchor_args['vd'] = vd
 
-    anchor_args['W'] = math.ceil((cav_lidar_range[3] - cav_lidar_range[0]) / vw) # W is image width, but along with x axis in lidar coordinate
-    anchor_args['H'] = math.ceil((cav_lidar_range[4] - cav_lidar_range[1]) / vh) # H is image height
+    anchor_args['W'] = math.ceil(
+        (cav_lidar_range[3] - cav_lidar_range[0]) / vw)  # W is image width, but along with x axis in lidar coordinate
+    anchor_args['H'] = math.ceil((cav_lidar_range[4] - cav_lidar_range[1]) / vh)  # H is image height
     anchor_args['D'] = math.ceil((cav_lidar_range[5] - cav_lidar_range[2]) / vd)
 
     param['postprocess'].update({'anchor_args': anchor_args})
@@ -361,8 +365,9 @@ def load_general_params(param):
     anchor_args['vh'] = vh
     anchor_args['vd'] = vd
 
-    anchor_args['W'] = math.ceil((cav_lidar_range[3] - cav_lidar_range[0]) / vw) # W is image width, but along with x axis in lidar coordinate
-    anchor_args['H'] = math.ceil((cav_lidar_range[4] - cav_lidar_range[1]) / vh) # H is image height
+    anchor_args['W'] = math.ceil(
+        (cav_lidar_range[3] - cav_lidar_range[0]) / vw)  # W is image width, but along with x axis in lidar coordinate
+    anchor_args['H'] = math.ceil((cav_lidar_range[4] - cav_lidar_range[1]) / vh)  # H is image height
     anchor_args['D'] = math.ceil((cav_lidar_range[5] - cav_lidar_range[2]) / vd)
 
     param['postprocess'].update({'anchor_args': anchor_args})

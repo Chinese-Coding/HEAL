@@ -1,17 +1,17 @@
 import argparse
+import glob
 import os
 import statistics
-import glob
+
 import torch
-from torch.utils.data import DataLoader, DistributedSampler
 from tensorboardX import SummaryWriter
+from torch.utils.data import DataLoader, DistributedSampler
 
 import opencood.hypes_yaml.yaml_utils as yaml_utils
-from opencood.tools import train_utils
 from opencood.data_utils.datasets import build_dataset
 from opencood.tools import multi_gpu_utils
-from icecream import ic
-import tqdm
+from opencood.tools import train_utils
+
 
 # CUDA_VISIBLE_DEVICES=0,1,2,3 python -m torch.distributed.launch --nproc_per_node=4 --use_env opencood/tools/train_ddp.py --hypes_yaml ${CONFIG_FILE} [--model_dir  ${CHECKPOINT_FOLDER}
 

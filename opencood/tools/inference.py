@@ -3,34 +3,33 @@
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
 import argparse
-import os
-import time
-from typing import OrderedDict
 import importlib
-import torch
-import open3d as o3d
-from torch.utils.data import DataLoader, Subset
+import os
+
 import numpy as np
+import torch
+from torch.utils.data import DataLoader
+
 import opencood.hypes_yaml.yaml_utils as yaml_utils
-from opencood.tools import train_utils, inference_utils
 from opencood.data_utils.datasets import build_dataset
+from opencood.tools import train_utils, inference_utils
 from opencood.utils import eval_utils
-from opencood.visualization import vis_utils, my_vis, simple_vis
 from opencood.utils.common_utils import update_dict
+from opencood.visualization import simple_vis
+
 torch.multiprocessing.set_sharing_strategy('file_system')
+
 
 def test_parser():
     parser = argparse.ArgumentParser(description="synthetic data generation")
     parser.add_argument('--model_dir', type=str, required=True,
                         help='Continued training path')
-    parser.add_argument('--fusion_method', type=str,
-                        default='intermediate',
+    parser.add_argument('--fusion_method', type=str, default='intermediate',
                         help='no, no_w_uncertainty, late, early or intermediate')
     parser.add_argument('--save_vis_interval', type=int, default=40,
                         help='interval of saving visualization')
     parser.add_argument('--save_npy', action='store_true',
-                        help='whether to save prediction and gt result'
-                             'in npy file')
+                        help='whether to save prediction and gt result in npy file')
     parser.add_argument('--range', type=str, default="102.4,102.4",
                         help="detection range is [-102.4, +102.4, -102.4, +102.4]")
     parser.add_argument('--no_score', action='store_true',
@@ -43,7 +42,7 @@ def test_parser():
 def main():
     opt = test_parser()
 
-    assert opt.fusion_method in ['late', 'early', 'intermediate', 'no', 'no_w_uncertainty', 'single'] 
+    assert opt.fusion_method in ['late', 'early', 'intermediate', 'no', 'no_w_uncertainty', 'single']
 
     hypes = yaml_utils.load_yaml(None, opt)
 
@@ -55,8 +54,8 @@ def main():
         y_min, y_max = -eval(opt.range.split(',')[1]), eval(opt.range.split(',')[1])
         opt.note += f"_{x_max}_{y_max}"
 
-        new_cav_range = [x_min, y_min, hypes['postprocess']['anchor_args']['cav_lidar_range'][2], \
-                            x_max, y_max, hypes['postprocess']['anchor_args']['cav_lidar_range'][5]]
+        new_cav_range = [x_min, y_min, hypes['postprocess']['anchor_args']['cav_lidar_range'][2],
+                         x_max, y_max, hypes['postprocess']['anchor_args']['cav_lidar_range'][5]]
 
         # replace all appearance
         hypes = update_dict(hypes, {
@@ -72,12 +71,10 @@ def main():
                 parser_func = func
         hypes = parser_func(hypes)
 
-        
-    
     hypes['validate_dir'] = hypes['test_dir']
     if "OPV2V" in hypes['test_dir'] or "v2xsim" in hypes['test_dir']:
         assert "test" in hypes['validate_dir']
-    
+
     # This is used in visualization
     # left hand: OPV2V, V2XSet
     # right hand: V2X-Sim 2.0 and DAIR-V2X
@@ -98,35 +95,33 @@ def main():
     resume_epoch, model = train_utils.load_saved_model(saved_path, model)
     print(f"resume from {resume_epoch} epoch.")
     opt.note += f"_epoch{resume_epoch}"
-    
+
     if torch.cuda.is_available():
         model.cuda()
     model.eval()
 
     # setting noise
     np.random.seed(303)
-    
+
     # build dataset for each noise setting
     print('Dataset Building')
     opencood_dataset = build_dataset(hypes, visualize=True, train=False)
     # opencood_dataset_subset = Subset(opencood_dataset, range(640,2100))
     # data_loader = DataLoader(opencood_dataset_subset,
     data_loader = DataLoader(opencood_dataset,
-                            batch_size=1,
-                            num_workers=4,
-                            collate_fn=opencood_dataset.collate_batch_test,
-                            shuffle=False,
-                            pin_memory=False,
-                            drop_last=False)
-    
+                             batch_size=1,
+                             num_workers=4,
+                             collate_fn=opencood_dataset.collate_batch_test,
+                             shuffle=False,
+                             pin_memory=False,
+                             drop_last=False)
+
     # Create the dictionary for evaluation
-    result_stat = {0.3: {'tp': [], 'fp': [], 'gt': 0, 'score': []},                
-                0.5: {'tp': [], 'fp': [], 'gt': 0, 'score': []},                
-                0.7: {'tp': [], 'fp': [], 'gt': 0, 'score': []}}
+    result_stat = {0.3: {'tp': [], 'fp': [], 'gt': 0, 'score': []},
+                   0.5: {'tp': [], 'fp': [], 'gt': 0, 'score': []},
+                   0.7: {'tp': [], 'fp': [], 'gt': 0, 'score': []}}
 
-    
     infer_info = opt.fusion_method + opt.note
-
 
     for i, batch_data in enumerate(data_loader):
         print(f"{infer_info}_{i}")
@@ -137,62 +132,62 @@ def main():
 
             if opt.fusion_method == 'late':
                 infer_result = inference_utils.inference_late_fusion(batch_data,
-                                                        model,
-                                                        opencood_dataset)
+                                                                     model,
+                                                                     opencood_dataset)
             elif opt.fusion_method == 'early':
                 infer_result = inference_utils.inference_early_fusion(batch_data,
-                                                        model,
-                                                        opencood_dataset)
+                                                                      model,
+                                                                      opencood_dataset)
             elif opt.fusion_method == 'intermediate':
                 infer_result = inference_utils.inference_intermediate_fusion(batch_data,
-                                                                model,
-                                                                opencood_dataset)
+                                                                             model,
+                                                                             opencood_dataset)
             elif opt.fusion_method == 'no':
                 infer_result = inference_utils.inference_no_fusion(batch_data,
-                                                                model,
-                                                                opencood_dataset)
+                                                                   model,
+                                                                   opencood_dataset)
             elif opt.fusion_method == 'no_w_uncertainty':
                 infer_result = inference_utils.inference_no_fusion_w_uncertainty(batch_data,
-                                                                model,
-                                                                opencood_dataset)
+                                                                                 model,
+                                                                                 opencood_dataset)
             elif opt.fusion_method == 'single':
                 infer_result = inference_utils.inference_no_fusion(batch_data,
-                                                                model,
-                                                                opencood_dataset,
-                                                                single_gt=True)
+                                                                   model,
+                                                                   opencood_dataset,
+                                                                   single_gt=True)
             else:
                 raise NotImplementedError('Only single, no, no_w_uncertainty, early, late and intermediate'
-                                        'fusion is supported.')
+                                          'fusion is supported.')
 
             pred_box_tensor = infer_result['pred_box_tensor']
             gt_box_tensor = infer_result['gt_box_tensor']
             pred_score = infer_result['pred_score']
-            
+
             eval_utils.caluclate_tp_fp(pred_box_tensor,
-                                    pred_score,
-                                    gt_box_tensor,
-                                    result_stat,
-                                    0.3)
+                                       pred_score,
+                                       gt_box_tensor,
+                                       result_stat,
+                                       0.3)
             eval_utils.caluclate_tp_fp(pred_box_tensor,
-                                    pred_score,
-                                    gt_box_tensor,
-                                    result_stat,
-                                    0.5)
+                                       pred_score,
+                                       gt_box_tensor,
+                                       result_stat,
+                                       0.5)
             eval_utils.caluclate_tp_fp(pred_box_tensor,
-                                    pred_score,
-                                    gt_box_tensor,
-                                    result_stat,
-                                    0.7)
+                                       pred_score,
+                                       gt_box_tensor,
+                                       result_stat,
+                                       0.7)
             if opt.save_npy:
                 npy_save_path = os.path.join(opt.model_dir, 'npy')
                 if not os.path.exists(npy_save_path):
                     os.makedirs(npy_save_path)
                 inference_utils.save_prediction_gt(pred_box_tensor,
-                                                gt_box_tensor,
-                                                batch_data['ego'][
-                                                    'origin_lidar'][0],
-                                                i,
-                                                npy_save_path)
+                                                   gt_box_tensor,
+                                                   batch_data['ego'][
+                                                       'origin_lidar'][0],
+                                                   i,
+                                                   npy_save_path)
 
             if not opt.no_score:
                 infer_result.update({'score_tensor': pred_score})
@@ -215,19 +210,20 @@ def main():
                 #                     vis_save_path,
                 #                     method='3d',
                 #                     left_hand=left_hand)
-                 
+
                 vis_save_path = os.path.join(vis_save_path_root, 'bev_%05d.png' % i)
                 simple_vis.visualize(infer_result,
-                                    batch_data['ego'][
-                                        'origin_lidar'][0],
-                                    hypes['postprocess']['gt_range'],
-                                    vis_save_path,
-                                    method='bev',
-                                    left_hand=left_hand)
+                                     batch_data['ego'][
+                                         'origin_lidar'][0],
+                                     hypes['postprocess']['gt_range'],
+                                     vis_save_path,
+                                     method='bev',
+                                     left_hand=left_hand)
         torch.cuda.empty_cache()
 
     _, ap50, ap70 = eval_utils.eval_final_results(result_stat,
-                                opt.model_dir, infer_info)
+                                                  opt.model_dir, infer_info)
+
 
 if __name__ == '__main__':
     main()

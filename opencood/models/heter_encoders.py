@@ -18,13 +18,14 @@ from opencood.utils.camera_utils import gen_dx_bx, cumsum_trick, QuickCumsum, de
 
 class PointPillar(nn.Module):
     def __init__(self, args):
-        super(PointPillar, self).__init__()
+        super().__init__()
         grid_size = (np.array(args['lidar_range'][3:6]) - np.array(args['lidar_range'][0:3])) / np.array(
             args['voxel_size'])
         grid_size = np.round(grid_size).astype(np.int64)
+        # TODO: 这样直接向 args 里面添加参数真的好吗?
         args['point_pillar_scatter']['grid_size'] = grid_size
 
-        # PIllar VFE
+        # Pillar VFE
         self.pillar_vfe = PillarVFE(args['pillar_vfe'], num_point_features=4, voxel_size=args['voxel_size'],
                                     point_cloud_range=args['lidar_range'])
         self.scatter = PointPillarScatter(args['point_pillar_scatter'])
