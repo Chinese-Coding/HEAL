@@ -16,6 +16,7 @@ class PFNLayer(nn.Module):
     在PointPillars模型中，点云数据首先被转换成柱状体素（pillar），然后通过PFN提取这些柱状体素的特征。
     具体来说，PFN负责将每个pillar中的点的特征进行编码和聚合，生成代表整个pillar的特征向量。
     """
+
     def __init__(self, in_channels: int, out_channels: int, use_norm=True, last_layer=False):
         """
 
@@ -74,23 +75,27 @@ class PFNLayer(nn.Module):
 class PillarVFE(nn.Module):
     def __init__(self, model_cfg, num_point_features, voxel_size, point_cloud_range):
         super().__init__()
+
         # 默认认为函数参数不可变, 所以要使用首先需要创建一个同名的变量 (加一个下划线如何?)
         _num_point_features = num_point_features
 
-        _num_point_features += 6 if model_cfg['use_absolute_xyz'] else 3
-        if model_cfg['with_distance']:
+        self.use_absolute_xyz = model_cfg['use_absolute_xyz']
+        self.with_distance = model_cfg['with_distance']
+
+        _num_point_features += 6 if self.use_absolute_xyz else 3
+        if self.with_distance:
             _num_point_features += 1
 
-        self.__num_filters = model_cfg['num_filters']
-        num_filters_len = len(self.__num_filters)
+        self.num_filters = model_cfg['num_filters']
+        num_filters_len = len(self.num_filters)
         assert num_filters_len > 0
-        self.__num_filters = [_num_point_features] + list(self.__num_filters)
+        self.num_filters = [_num_point_features] + list(self.num_filters)
 
         pfn_layers = []
 
         for i in range(num_filters_len - 1):
-            in_filters = self.__num_filters[i]
-            out_filters = self.__num_filters[i + 1]
+            in_filters = self.num_filters[i]
+            out_filters = self.num_filters[i + 1]
             pfn_layers.append(
                 PFNLayer(in_filters, out_filters, model_cfg['use_norm'], last_layer=(i >= num_filters_len - 2)))
         self.pfn_layers = nn.ModuleList(pfn_layers)
@@ -103,7 +108,7 @@ class PillarVFE(nn.Module):
         self.z_offset = self.voxel_z / 2 + point_cloud_range[2]
 
     def get_output_feature_dim(self):
-        return self.__num_filters[-1]
+        return self.num_filters[-1]
 
     @staticmethod
     def get_paddings_indicator(actual_num, max_num, axis=0):
@@ -151,12 +156,12 @@ class PillarVFE(nn.Module):
             features = [voxel_features[..., 3:], f_cluster, f_center]
 
         if self.with_distance:
-            points_dist = torch.norm(voxel_features[:, :, :3], 2, 2,keepdim=True)
+            points_dist = torch.norm(voxel_features[:, :, :3], 2, 2, keepdim=True)
             features.append(points_dist)
         features = torch.cat(features, dim=-1)
 
         voxel_count = features.shape[1]
-        mask = self.get_paddings_indicator(voxel_num_points, voxel_count,axis=0)
+        mask = self.get_paddings_indicator(voxel_num_points, voxel_count, axis=0)
         mask = torch.unsqueeze(mask, -1).type_as(voxel_features)
         features *= mask
         for pfn in self.pfn_layers:

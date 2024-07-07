@@ -1,4 +1,4 @@
-'''
+"""
 -*- coding: utf-8 -*-
 Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 License: TDG-Attribution-NonCommercial-NoDistrib
@@ -6,9 +6,9 @@ License: TDG-Attribution-NonCommercial-NoDistrib
 intermediate heter fusion dataset
 
 Note that for DAIR-V2X dataset,
-Each agent should retrieve the objects itself, and merge them by iou, 
+Each agent should retrieve the objects itself, and merge them by iou,
 instead of using the cooperative label.
-'''
+"""
 
 import copy
 import math
@@ -139,9 +139,7 @@ def getIntermediateheterFusionDataset(cls):
                 lidar_np = mask_ego_points(lidar_np)
                 # project the lidar to ego space
                 # x,y,z in ego space
-                projected_lidar = \
-                    box_utils.project_points_by_matrix_torch(lidar_np[:, :3],
-                                                             transformation_matrix)
+                projected_lidar = box_utils.project_points_by_matrix_torch(lidar_np[:, :3], transformation_matrix)
                 if self.proj_first:
                     lidar_np[:, :3] = projected_lidar
 
@@ -301,10 +299,17 @@ def getIntermediateheterFusionDataset(cls):
             assert ego_id != -1
             assert len(ego_lidar_pose) > 0
 
-            input_list_m1 = []  # can contain lidar or camera
-            input_list_m2 = []
-            input_list_m3 = []
-            input_list_m4 = []
+            # can contain lidar or camera
+            # input_list_m1 = []
+            # input_list_m2 = []
+            # input_list_m3 = []
+            # input_list_m4 = []
+            input_list_dict = {
+                'input_list_m1': [],
+                'input_list_m2': [],
+                'input_list_m3': [],
+                'input_list_m4': []
+            }
 
             agent_modality_list = []
             object_stack = []
@@ -320,20 +325,23 @@ def getIntermediateheterFusionDataset(cls):
 
             if self.visualize or self.kd_flag:
                 projected_lidar_stack = []
-                input_list_m1_proj = []  # 2023.8.31 to correct discretization errors with kd flag
-                input_list_m2_proj = []
-                input_list_m3_proj = []
-                input_list_m4_proj = []
+                # input_list_m1_proj = []  # 2023.8.31 to correct discretization errors with kd flag
+                # input_list_m2_proj = []
+                # input_list_m3_proj = []
+                # input_list_m4_proj = []
+                input_list_proj_dict = {
+                    'input_list_m1_proj': [],
+                    'input_list_m2_proj': [],
+                    'input_list_m3_proj': [],
+                    'input_list_m4_proj': [],
+                }
 
             # loop over all CAVs to process information
             for cav_id, selected_cav_base in base_data_dict.items():
                 # check if the cav is within the communication range with ego
-                distance = \
-                    math.sqrt((selected_cav_base['params']['lidar_pose'][0] -
-                               ego_lidar_pose[0]) ** 2 + (
-                                      selected_cav_base['params'][
-                                          'lidar_pose'][1] - ego_lidar_pose[
-                                          1]) ** 2)
+                distance = math.sqrt((selected_cav_base['params']['lidar_pose'][0] -
+                                      ego_lidar_pose[0]) ** 2 + (
+                                             selected_cav_base['params']['lidar_pose'][1] - ego_lidar_pose[1]) ** 2)
 
                 # if distance is too far, we will just skip this agent
                 if distance > self.params['comm_range']:
@@ -388,10 +396,7 @@ def getIntermediateheterFusionDataset(cls):
                             lidar_pose_list[i] = cur_agnet_pose[i].tolist()
                             base_data_dict[cav_id]['params']['lidar_pose'] = cur_agnet_pose[i].tolist()
 
-            pairwise_t_matrix = \
-                get_pairwise_transformation(base_data_dict,
-                                            self.max_cav,
-                                            self.proj_first)
+            pairwise_t_matrix = get_pairwise_transformation(base_data_dict, self.max_cav, self.proj_first)
 
             lidar_poses = np.array(lidar_pose_list).reshape(-1, 6)  # [N_cav, 6]
             lidar_poses_clean = np.array(lidar_pose_clean_list).reshape(-1, 6)  # [N_cav, 6]
@@ -419,10 +424,14 @@ def getIntermediateheterFusionDataset(cls):
                 object_id_stack += selected_cav_processed['object_ids']
 
                 if sensor_type == "lidar":
-                    eval(f"input_list_{modality_name}").append(
+                    input_list_dict[f'input_list_{modality_name}'].append(
                         selected_cav_processed[f"processed_features_{modality_name}"])
+                    # eval(f"input_list_{modality_name}").append(
+                    #     selected_cav_processed[f"processed_features_{modality_name}"])
                 elif sensor_type == "camera":
-                    eval(f"input_list_{modality_name}").append(selected_cav_processed[f"image_inputs_{modality_name}"])
+                    input_list_dict[f"input_list_{modality_name}"].append(
+                        selected_cav_processed[f"image_inputs_{modality_name}"])
+                    # eval(f"input_list_{modality_name}").append(selected_cav_processed[f"image_inputs_{modality_name}"])
                 else:
                     raise
 
@@ -433,8 +442,10 @@ def getIntermediateheterFusionDataset(cls):
                     projected_lidar_stack.append(
                         selected_cav_processed['projected_lidar'])
                     if sensor_type == "lidar" and self.kd_flag:
-                        eval(f"input_list_{modality_name}_proj").append(
+                        input_list_proj_dict[f"input_list_{modality_name}_proj"].append(
                             selected_cav_processed[f"processed_features_{modality_name}_proj"])
+                        # eval(f"input_list_{modality_name}_proj").append(
+                        #     selected_cav_processed[f"processed_features_{modality_name}_proj"])
 
                 if self.supervise_single or self.heterogeneous:
                     single_label_list.append(selected_cav_processed['single_label_dict'])
@@ -484,25 +495,26 @@ def getIntermediateheterFusionDataset(cls):
                 object_id_stack = np.arange(object_stack.shape[0])
             else:
                 # exclude all repetitive objects, OPV2V-H
-                unique_indices = \
-                    [object_id_stack.index(x) for x in set(object_id_stack)]
+                unique_indices = [object_id_stack.index(x) for x in set(object_id_stack)]
                 object_stack = np.vstack(object_stack)
                 object_stack = object_stack[unique_indices]
 
             # make sure bounding boxes across all frames have the same number
-            object_bbx_center = \
-                np.zeros((self.params['postprocess']['max_num'], 7))
+            object_bbx_center = np.zeros((self.params['postprocess']['max_num'], 7))
             mask = np.zeros(self.params['postprocess']['max_num'])
             object_bbx_center[:object_stack.shape[0], :] = object_stack
             mask[:object_stack.shape[0]] = 1
 
             for modality_name in self.modality_name_list:
                 if self.sensor_type_dict[modality_name] == "lidar":
-                    merged_feature_dict = merge_features_to_dict(eval(f"input_list_{modality_name}"))
+                    # merged_feature_dict = merge_features_to_dict(eval(f"input_list_{modality_name}"))
+                    merged_feature_dict = merge_features_to_dict(input_list_dict[f"input_list_{modality_name}"])
                     processed_data_dict['ego'].update({f'input_{modality_name}': merged_feature_dict})  # maybe None
                 elif self.sensor_type_dict[modality_name] == "camera":
-                    merged_image_inputs_dict = merge_features_to_dict(eval(f"input_list_{modality_name}"),
+                    merged_image_inputs_dict = merge_features_to_dict(input_list_dict[f"input_list_{modality_name}"],
                                                                       merge='stack')
+                    # merged_image_inputs_dict = merge_features_to_dict(eval(f"input_list_{modality_name}"),
+                    #                                                   merge='stack')
                     processed_data_dict['ego'].update(
                         {f'input_{modality_name}': merged_image_inputs_dict})  # maybe None
 
@@ -514,19 +526,19 @@ def getIntermediateheterFusionDataset(cls):
                 #                                 'cav_lidar_range'])
                 # stack_feature_processed = self.pre_processor.preprocess(stack_lidar_np)
                 for modality_name in self.modality_name_list:
+                    # processed_data_dict['ego'].update({
+                    #     f'input_{modality_name}_proj': merge_features_to_dict(eval(f"input_list_{modality_name}_proj"))
                     processed_data_dict['ego'].update({
-                        f'input_{modality_name}_proj': merge_features_to_dict(eval(f"input_list_{modality_name}_proj"))
+                        f'input_{modality_name}_proj':
+                            merge_features_to_dict(input_list_proj_dict[f"input_list_{modality_name}_proj"])
                         # maybe None
                     })
 
             processed_data_dict['ego'].update({'agent_modality_list': agent_modality_list})
 
             # generate targets label
-            label_dict = \
-                self.post_processor.generate_label(
-                    gt_box_center=object_bbx_center,
-                    anchors=self.anchor_box,
-                    mask=mask)
+            label_dict = self.post_processor.generate_label(gt_box_center=object_bbx_center, anchors=self.anchor_box,
+                                                            mask=mask)
 
             processed_data_dict['ego'].update(
                 {'object_bbx_center': object_bbx_center,
@@ -552,6 +564,30 @@ def getIntermediateheterFusionDataset(cls):
         def collate_batch_train(self, batch):
             # Intermediate fusion is different the other two
             output_dict = {'ego': {}}
+
+            # inputs_list_m1 = []
+            # inputs_list_m2 = []
+            # inputs_list_m3 = []
+            # inputs_list_m4 = []
+
+            inputs_list_dict = {
+                'inputs_list_m1': [],
+                'inputs_list_m2': [],
+                'inputs_list_m3': [],
+                'inputs_list_m4': []
+            }
+
+            # inputs_list_m1_proj = []
+            # inputs_list_m2_proj = []
+            # inputs_list_m3_proj = []
+            # inputs_list_m4_proj = []
+
+            inputs_list_proj_dict = {
+                'inputs_list_m1_proj': [],
+                'inputs_list_m2_proj': [],
+                'inputs_list_m3_proj': [],
+                'inputs_list_m4_proj': [],
+            }
 
             object_bbx_center = []
             object_bbx_mask = []
@@ -590,7 +626,8 @@ def getIntermediateheterFusionDataset(cls):
                 for modality_name in self.modality_name_list:
                     if ego_dict[f'input_{modality_name}'] is not None:
                         # OrderedDict() if empty?
-                        eval(f"inputs_list_{modality_name}").append(ego_dict[f'input_{modality_name}'])
+                        inputs_list_dict[f'inputs_list_{modality_name}'].append(ego_dict[f'input_{modality_name}'])
+                        # eval(f"inputs_list_{modality_name}").append(ego_dict[f'input_{modality_name}'])
 
                 agent_modality_list.extend(ego_dict['agent_modality_list'])
 
@@ -606,7 +643,9 @@ def getIntermediateheterFusionDataset(cls):
                     # teacher_processed_lidar_list.append(ego_dict['teacher_processed_lidar'])
                     for modality_name in self.modality_name_list:
                         if ego_dict[f'input_{modality_name}_proj'] is not None:
-                            eval(f"inputs_list_{modality_name}_proj").append(ego_dict[f"input_{modality_name}_proj"])
+                            inputs_list_proj_dict[f'inputs_list_{modality_name}_proj'].append(
+                                ego_dict[f'input_{modality_name}_proj'])
+                            # eval(f"inputs_list_{modality_name}_proj").append(ego_dict[f"input_{modality_name}_proj"])
 
                 ### 2022.10.10 single gt ####
                 if self.supervise_single or self.heterogeneous:
@@ -622,16 +661,18 @@ def getIntermediateheterFusionDataset(cls):
 
             # 2023.2.5
             for modality_name in self.modality_name_list:
-                if len(eval(f"inputs_list_{modality_name}")) != 0:
+                # if len(eval(f"inputs_list_{modality_name}")) != 0:
+                if len(inputs_list_dict[f'inputs_list_{modality_name}']) != 0:
                     if self.sensor_type_dict[modality_name] == "lidar":
-                        merged_feature_dict = merge_features_to_dict(eval(f"inputs_list_{modality_name}"))
+                        # merged_feature_dict = merge_features_to_dict(eval(f"inputs_list_{modality_name}"))
+                        merged_feature_dict = merge_features_to_dict(inputs_list_dict[f'inputs_list_{modality_name}'])
                         processed_lidar_torch_dict = eval(f"self.pre_processor_{modality_name}").collate_batch(
                             merged_feature_dict)
                         output_dict['ego'].update({f'inputs_{modality_name}': processed_lidar_torch_dict})
 
                     elif self.sensor_type_dict[modality_name] == "camera":
-                        merged_image_inputs_dict = merge_features_to_dict(eval(f"inputs_list_{modality_name}"),
-                                                                          merge='cat')
+                        merged_image_inputs_dict = merge_features_to_dict(
+                            inputs_list_dict[f'inputs_list_{modality_name}'], merge='cat')
                         output_dict['ego'].update({f'inputs_{modality_name}': merged_image_inputs_dict})
 
             output_dict['ego'].update({"agent_modality_list": agent_modality_list})
@@ -639,8 +680,7 @@ def getIntermediateheterFusionDataset(cls):
             record_len = torch.from_numpy(np.array(record_len, dtype=int))
             lidar_pose = torch.from_numpy(np.concatenate(lidar_pose_list, axis=0))
             lidar_pose_clean = torch.from_numpy(np.concatenate(lidar_pose_clean_list, axis=0))
-            label_torch_dict = \
-                self.post_processor.collate_batch(label_dict_list)
+            label_torch_dict = self.post_processor.collate_batch(label_dict_list)
 
             # for centerpoint
             label_torch_dict.update({'object_bbx_center': object_bbx_center,
@@ -752,8 +792,7 @@ def getIntermediateheterFusionDataset(cls):
             gt_box_tensor : torch.Tensor
                 The tensor of gt bounding box.
             """
-            pred_box_tensor, pred_score = \
-                self.post_processor.post_process(data_dict, output_dict)
+            pred_box_tensor, pred_score = self.post_processor.post_process(data_dict, output_dict)
             gt_box_tensor = self.post_processor.generate_gt_bbx(data_dict)
 
             return pred_box_tensor, pred_score, gt_box_tensor

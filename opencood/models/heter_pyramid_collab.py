@@ -208,7 +208,6 @@ class HeterPyramidCollab(nn.Module):
                             'reg_preds': reg_preds,
                             'dir_preds': dir_preds})
 
-        output_dict.update({'occ_single_list':
-                                occ_outputs})
+        output_dict.update({'occ_single_list':occ_outputs})
 
         return output_dict
