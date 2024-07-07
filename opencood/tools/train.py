@@ -15,6 +15,20 @@ import opencood.hypes_yaml.yaml_utils as yaml_utils
 from opencood.data_utils.datasets import build_dataset
 from opencood.tools import train_utils
 
+def get_free_gpu():
+    import pynvml
+    pynvml.nvmlInit()
+    min_memory_used = float('inf')
+    selected_gpu = 0
+    for i in range(torch.cuda.device_count()):
+        handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+        mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        if mem_info.used < min_memory_used:
+            min_memory_used = mem_info.used
+            selected_gpu = i
+    pynvml.nvmlShutdown()
+
+    return selected_gpu
 
 def train_parser():
     """
@@ -37,7 +51,7 @@ def main():
     opt = train_parser()
     hypes = yaml_utils.load_yaml(opt.hypes_yaml, opt)
 
-    print('Dataset Building')
+    print('\033[92m[INFO]\033[0m Dataset Building')
     opencood_train_dataset = build_dataset(hypes, visualize=False, train=True)
     opencood_validate_dataset = build_dataset(hypes, visualize=False, train=False)
 
@@ -58,9 +72,15 @@ def main():
                             drop_last=True,
                             prefetch_factor=2)
 
-    print('Creating Model')
+    print('\033[92m[INFO]\033[0m Creating Model')
     model = train_utils.create_model(hypes)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        free_gpu = get_free_gpu()
+        torch.cuda.set_device(free_gpu)
+        device = torch.device(f'cuda:{free_gpu}')
+    else:
+        device = torch.device('cpu')
+    print(f'\033[92m[INFO]\033[0m Using device: {device}')
 
     # record lowest validation loss checkpoint.
     lowest_val_loss = 1e5
@@ -112,6 +132,7 @@ def main():
             model.model_train_init()
         except:
             print("No model_train_init function")
+
         for i, batch_data in enumerate(train_loader):
             if batch_data is None or batch_data['ego']['object_bbx_mask'].sum() == 0:
                 continue
@@ -119,13 +140,13 @@ def main():
             optimizer.zero_grad()
             batch_data = train_utils.to_device(batch_data, device)
             batch_data['ego']['epoch'] = epoch
-            ouput_dict = model(batch_data['ego'])
+            output_dict = model(batch_data['ego'])
 
-            final_loss = criterion(ouput_dict, batch_data['ego']['label_dict'])
+            final_loss = criterion(output_dict, batch_data['ego']['label_dict'])
             criterion.logging(epoch, i, len(train_loader), writer)
 
             if supervise_single_flag:
-                final_loss += criterion(ouput_dict, batch_data['ego']['label_dict_single'], suffix="_single") * hypes[
+                final_loss += criterion(output_dict, batch_data['ego']['label_dict_single'], suffix="_single") * hypes[
                     'train_params'].get("single_weight", 1)
                 criterion.logging(epoch, i, len(train_loader), writer, suffix="_single")
 
@@ -151,9 +172,9 @@ def main():
 
                     batch_data = train_utils.to_device(batch_data, device)
                     batch_data['ego']['epoch'] = epoch
-                    ouput_dict = model(batch_data['ego'])
+                    output_dict = model(batch_data['ego'])
 
-                    final_loss = criterion(ouput_dict,
+                    final_loss = criterion(output_dict,
                                            batch_data['ego']['label_dict'])
                     print(f'val loss {final_loss:.3f}')
                     valid_ave_loss.append(final_loss.item())

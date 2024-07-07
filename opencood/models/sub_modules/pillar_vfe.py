@@ -37,7 +37,7 @@ class PFNLayer(nn.Module):
         self.linear = nn.Linear(in_channels, out_channels, bias=not self.use_norm)
         if self.use_norm:
             self.norm = nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.01)
-
+        """"""
         self.part = 50000
 
     def forward(self, inputs: Tensor) -> Tensor:
@@ -90,7 +90,7 @@ class PillarVFE(nn.Module):
         num_filters_len = len(self.num_filters)
         assert num_filters_len > 0
         self.num_filters = [_num_point_features] + list(self.num_filters)
-
+        num_filters_len = len(self.num_filters) # 更新 `self.num_filters` 后记得更新其长度, 一晚上都在搞这个问题, damn!
         pfn_layers = []
 
         for i in range(num_filters_len - 1):
@@ -133,6 +133,12 @@ class PillarVFE(nn.Module):
         """
         voxel_features, voxel_num_points, coords = (
             batch_dict['voxel_features'], batch_dict['voxel_num_points'], batch_dict['voxel_coords'])
+
+        # 根据代码注释检查一下 Tensor 的形状
+        M = voxel_features.shape[0]
+        assert voxel_features.shape == (M, 32, 4), f"voxel_features shape is incorrect: {voxel_features.shape}"
+        assert voxel_num_points.shape == (M,), f"voxel_num_points shape is incorrect: {voxel_num_points.shape}"
+        assert coords.shape == (M, 4), f"coords shape is incorrect: {coords.shape}"
 
         points_mean = (voxel_features[:, :, :3].sum(dim=1, keepdim=True) /
                        voxel_num_points.type_as(voxel_features).view(-1, 1, 1))
