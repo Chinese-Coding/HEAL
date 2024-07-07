@@ -5,7 +5,7 @@ test_dir: "dataset/OPV2V/test"
 
 yaml_parser: "load_general_params"
 train_params:
-  batch_size: &batch_size 2
+  batch_size: 2
   epoches: 45
   eval_freq: 4
   save_freq: 4
@@ -186,7 +186,7 @@ model:
         grid_conf: *grid_conf_m2
         data_aug_conf: *data_aug_conf_m2
         img_downsample: 8
-        img_features: &img_feature 128
+        img_features: 128
         use_depth_gt: false
         depth_supervision: true
         camera_encoder: EfficientNet

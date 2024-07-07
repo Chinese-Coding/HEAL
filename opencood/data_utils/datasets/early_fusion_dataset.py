@@ -2,17 +2,14 @@
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
-import torch
-import numpy as np
-from opencood.utils.pcd_utils import downsample_lidar_minimum
 import math
 from collections import OrderedDict
 
+import numpy as np
+import torch
+
 from opencood.utils import box_utils
 from opencood.utils.common_utils import merge_features_to_dict
-from opencood.data_utils.post_processor import build_postprocessor
-from opencood.data_utils.pre_processor import build_preprocessor
-from opencood.hypes_yaml.yaml_utils import load_yaml
 from opencood.utils.pcd_utils import \
     mask_points_by_range, mask_ego_points, shuffle_points, \
     downsample_lidar_minimum
@@ -25,13 +22,15 @@ def getEarlyFusionDataset(cls):
         This dataset is used for early fusion, where each CAV transmit the raw
         point cloud to the ego vehicle.
         """
+
         def __init__(self, params, visualize, train=True):
             super(EarlyFusionDataset, self).__init__(params, visualize, train)
-            self.supervise_single = True if ('supervise_single' in params['model']['args'] and params['model']['args']['supervise_single']) \
-                                        else False
+            self.supervise_single = True if (
+                        'supervise_single' in params['model']['args'] and params['model']['args']['supervise_single']) \
+                else False
             assert self.supervise_single is False
-            self.proj_first = False if 'proj_first' not in params['fusion']['args']\
-                                         else params['fusion']['args']['proj_first']
+            self.proj_first = False if 'proj_first' not in params['fusion']['args'] \
+                else params['fusion']['args']['proj_first']
             self.anchor_box = self.post_processor.generate_anchor_box()
             self.anchor_box_torch = torch.from_numpy(self.anchor_box)
 
@@ -67,10 +66,10 @@ def getEarlyFusionDataset(cls):
                 # check if the cav is within the communication range with ego
                 distance = \
                     math.sqrt((selected_cav_base['params']['lidar_pose'][0] -
-                            ego_lidar_pose[0]) ** 2 + (
-                                    selected_cav_base['params'][
-                                        'lidar_pose'][1] - ego_lidar_pose[
-                                        1]) ** 2)
+                               ego_lidar_pose[0]) ** 2 + (
+                                      selected_cav_base['params'][
+                                          'lidar_pose'][1] - ego_lidar_pose[
+                                          1]) ** 2)
                 if distance > self.params['comm_range']:
                     continue
 
@@ -106,18 +105,18 @@ def getEarlyFusionDataset(cls):
 
             # we do lidar filtering in the stacked lidar
             projected_lidar_stack = mask_points_by_range(projected_lidar_stack,
-                                                        self.params['preprocess'][
-                                                            'cav_lidar_range'])
+                                                         self.params['preprocess'][
+                                                             'cav_lidar_range'])
             # augmentation may remove some of the bbx out of range
             object_bbx_center_valid = object_bbx_center[mask == 1]
             object_bbx_center_valid, range_mask = \
                 box_utils.mask_boxes_outside_range_numpy(object_bbx_center_valid,
-                                                        self.params['preprocess'][
-                                                            'cav_lidar_range'],
-                                                        self.params['postprocess'][
-                                                            'order'],
-                                                        return_mask=True
-                                                        )
+                                                         self.params['preprocess'][
+                                                             'cav_lidar_range'],
+                                                         self.params['postprocess'][
+                                                             'order'],
+                                                         return_mask=True
+                                                         )
             mask[object_bbx_center_valid.shape[0]:] = 0
             object_bbx_center[:object_bbx_center_valid.shape[0]] = \
                 object_bbx_center_valid
@@ -139,15 +138,15 @@ def getEarlyFusionDataset(cls):
 
             processed_data_dict['ego'].update(
                 {'object_bbx_center': object_bbx_center,
-                'object_bbx_mask': mask,
-                'object_ids': [object_id_stack[i] for i in unique_indices],
-                'anchor_box': anchor_box,
-                'processed_lidar': lidar_dict,
-                'label_dict': label_dict})
+                 'object_bbx_mask': mask,
+                 'object_ids': [object_id_stack[i] for i in unique_indices],
+                 'anchor_box': anchor_box,
+                 'processed_lidar': lidar_dict,
+                 'label_dict': label_dict})
 
             if self.visualize:
                 processed_data_dict['ego'].update({'origin_lidar':
-                                                    projected_lidar_stack})
+                                                       projected_lidar_stack})
 
             return processed_data_dict
 
@@ -172,12 +171,12 @@ def getEarlyFusionDataset(cls):
             # calculate the transformation matrix
             transformation_matrix = \
                 x1_to_x2(selected_cav_base['params']['lidar_pose'],
-                        ego_pose)
+                         ego_pose)
 
             # retrieve objects under ego coordinates
             object_bbx_center, object_bbx_mask, object_ids = \
                 self.generate_object_center([selected_cav_base],
-                                                        ego_pose)
+                                            ego_pose)
 
             # filter lidar
             lidar_np = selected_cav_base['lidar_np']
@@ -187,12 +186,12 @@ def getEarlyFusionDataset(cls):
             # project the lidar to ego space
             lidar_np[:, :3] = \
                 box_utils.project_points_by_matrix_torch(lidar_np[:, :3],
-                                                        transformation_matrix)
+                                                         transformation_matrix)
 
             selected_cav_processed.update(
                 {'object_bbx_center': object_bbx_center[object_bbx_mask == 1],
-                'object_ids': object_ids,
-                'projected_lidar': lidar_np})
+                 'object_ids': object_ids,
+                 'projected_lidar': lidar_np})
 
             return selected_cav_processed
 
@@ -212,7 +211,7 @@ def getEarlyFusionDataset(cls):
             """
             # currently, we only support batch size of 1 during testing
             assert len(batch) <= 1, "Batch size 1 is required during testing!"
-            batch = batch[0] # only ego
+            batch = batch[0]  # only ego
 
             output_dict = {}
 
@@ -265,7 +264,7 @@ def getEarlyFusionDataset(cls):
                     output_dict[cav_id].update({'origin_lidar': origin_lidar})
 
             return output_dict
-        
+
         def collate_batch_train(self, batch):
             # Intermediate fusion is different the other two
             output_dict = {'ego': {}}
@@ -278,13 +277,13 @@ def getEarlyFusionDataset(cls):
             # used to record different scenario
             label_dict_list = []
             origin_lidar = []
-            
+
             # heterogeneous
             lidar_agent_list = []
 
             # pairwise transformation matrix
             pairwise_t_matrix_list = []
-            
+
             ### 2022.10.10 single gt ####
             if self.supervise_single:
                 pos_equal_one_single = []
@@ -299,8 +298,9 @@ def getEarlyFusionDataset(cls):
                 if self.load_lidar_file:
                     processed_lidar_list.append(ego_dict['processed_lidar'])
                 if self.load_camera_file:
-                    image_inputs_list.append(ego_dict['image_inputs']) # different cav_num, ego_dict['image_inputs'] is dict.
-                
+                    image_inputs_list.append(
+                        ego_dict['image_inputs'])  # different cav_num, ego_dict['image_inputs'] is dict.
+
                 label_dict_list.append(ego_dict['label_dict'])
 
                 if self.visualize:
@@ -326,7 +326,7 @@ def getEarlyFusionDataset(cls):
                 if self.heterogeneous:
                     lidar_agent = np.concatenate(lidar_agent_list)
                     lidar_agent_idx = lidar_agent.nonzero()[0].tolist()
-                    for k, v in merged_feature_dict.items(): # 'voxel_features' 'voxel_num_points' 'voxel_coords'
+                    for k, v in merged_feature_dict.items():  # 'voxel_features' 'voxel_num_points' 'voxel_coords'
                         merged_feature_dict[k] = [v[index] for index in lidar_agent_idx]
 
                 if not self.heterogeneous or (self.heterogeneous and sum(lidar_agent) != 0):
@@ -341,18 +341,18 @@ def getEarlyFusionDataset(cls):
                     camera_agent = 1 - lidar_agent
                     camera_agent_idx = camera_agent.nonzero()[0].tolist()
                     if sum(camera_agent) != 0:
-                        for k, v in merged_image_inputs_dict.items(): # 'imgs' 'rots' 'trans' ...
+                        for k, v in merged_image_inputs_dict.items():  # 'imgs' 'rots' 'trans' ...
                             merged_image_inputs_dict[k] = torch.stack([v[index] for index in camera_agent_idx])
-                            
+
                 if not self.heterogeneous or (self.heterogeneous and sum(camera_agent) != 0):
                     output_dict['ego'].update({'image_inputs': merged_image_inputs_dict})
-            
+
             label_torch_dict = \
                 self.post_processor.collate_batch(label_dict_list)
 
             # for centerpoint
             label_torch_dict.update({'object_bbx_center': object_bbx_center,
-                                    'object_bbx_mask': object_bbx_mask})
+                                     'object_bbx_mask': object_bbx_mask})
 
             # (B, max_cav)
             pairwise_t_matrix = torch.from_numpy(np.array(pairwise_t_matrix_list))
@@ -362,10 +362,9 @@ def getEarlyFusionDataset(cls):
             # object id is only used during inference, where batch size is 1.
             # so here we only get the first element.
             output_dict['ego'].update({'object_bbx_center': object_bbx_center,
-                                    'object_bbx_mask': object_bbx_mask,
-                                    'label_dict': label_torch_dict,
-                                    'object_ids': object_ids[0]})
-
+                                       'object_bbx_mask': object_bbx_mask,
+                                       'label_dict': label_torch_dict,
+                                       'object_ids': object_ids[0]})
 
             if self.visualize:
                 origin_lidar = \
@@ -375,15 +374,15 @@ def getEarlyFusionDataset(cls):
 
             if self.supervise_single:
                 output_dict['ego'].update({
-                    "label_dict_single" : 
+                    "label_dict_single":
                         {"pos_equal_one": torch.cat(pos_equal_one_single, dim=0),
-                        "neg_equal_one": torch.cat(neg_equal_one_single, dim=0),
-                        "targets": torch.cat(targets_single, dim=0)}
+                         "neg_equal_one": torch.cat(neg_equal_one_single, dim=0),
+                         "targets": torch.cat(targets_single, dim=0)}
                 })
 
             if self.heterogeneous:
                 output_dict['ego'].update({
-                    "lidar_agent_record": torch.from_numpy(np.concatenate(lidar_agent_list)) # [0,1,1,0,1...]
+                    "lidar_agent_record": torch.from_numpy(np.concatenate(lidar_agent_list))  # [0,1,1,0,1...]
                 })
 
             return output_dict
@@ -414,4 +413,3 @@ def getEarlyFusionDataset(cls):
             return pred_box_tensor, pred_score, gt_box_tensor
 
     return EarlyFusionDataset
-

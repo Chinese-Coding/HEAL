@@ -5,20 +5,20 @@ test_dir: "dataset/OPV2V/test"
 
 yaml_parser: "load_general_params"
 train_params:
-  batch_size: &batch_size 2
+  batch_size: 2
   epoches: 30
   eval_freq: 2
   save_freq: 2
   max_cav: 5
 
 comm_range: 70
-input_source: ['lidar']
+input_source: [ 'lidar' ]
 label_type: 'lidar'
-cav_lidar_range: &cav_lidar [-102.4, -102.4, -3, 102.4, 102.4, 1]
+cav_lidar_range: &cav_lidar [ -102.4, -102.4, -3, 102.4, 102.4, 1 ]
 
 
 heter:
-  assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
+  assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json"
   ego_modality: &ego_modality "m3"
   lidar_channels_dict:
     m3: 32
@@ -37,7 +37,7 @@ heter:
         # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
         core_method: 'SpVoxelPreprocessor'
         args:
-          voxel_size: &voxel_size_m3 [0.1, 0.1, 0.1]
+          voxel_size: &voxel_size_m3 [ 0.1, 0.1, 0.1 ]
           max_points_per_voxel: 5
           max_voxel_train: 32000
           max_voxel_test: 70000
@@ -47,7 +47,7 @@ heter:
 fusion:
   core_method: 'intermediateheter'
   dataset: 'opv2v'
-  args: 
+  args:
     proj_first: false
     grid_conf: None # place-holder
     data_aug_conf: None # place-holder
@@ -57,7 +57,7 @@ preprocess:
   # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
   core_method: 'SpVoxelPreprocessor'
   args:
-    voxel_size: [0.4, 0.4, 4] # useful
+    voxel_size: [ 0.4, 0.4, 4 ] # useful
     max_points_per_voxel: 1 # useless
     max_voxel_train: 1 # useless
     max_voxel_test: 1 # useless
@@ -73,7 +73,7 @@ postprocess:
     l: 3.9
     w: 1.6
     h: 1.56
-    r: &anchor_yaw [0, 90]
+    r: &anchor_yaw [ 0, 90 ]
     feature_stride: 2
     num: &anchor_num 2
   target_args:
@@ -111,24 +111,24 @@ model:
           feature_num: 128
 
       backbone_args:
-        layer_nums: [3]
-        layer_strides: [1]
-        num_filters: [64]
+        layer_nums: [ 3 ]
+        layer_strides: [ 1 ]
+        num_filters: [ 64 ]
         inplanes: 128
       
       aligner_args:
         core_method: identity
 
-    fusion_backbone: 
+    fusion_backbone:
       resnext: true
-      layer_nums: [3, 5, 8]
-      layer_strides: [1, 2, 2]
-      num_filters: [64, 128, 256]
-      upsample_strides: [1, 2, 4]
-      num_upsample_filter: [128, 128, 128]
+      layer_nums: [ 3, 5, 8 ]
+      layer_strides: [ 1, 2, 2 ]
+      num_filters: [ 64, 128, 256 ]
+      upsample_strides: [ 1, 2, 4 ]
+      num_upsample_filter: [ 128, 128, 128 ]
       anchor_number: *anchor_num
 
-    shrink_header: 
+    shrink_header:
       kernal_size: [ 3 ]
       stride: [ 1 ]
       padding: [ 1 ]
@@ -161,8 +161,8 @@ loss:
     depth:
       weight: 1.0
     pyramid:
-      relative_downsample: [1, 2, 4]
-      weight: [0.4, 0.2, 0.1]
+      relative_downsample: [ 1, 2, 4 ]
+      weight: [ 0.4, 0.2, 0.1 ]
 
 
 optimizer:
@@ -175,5 +175,5 @@ optimizer:
 lr_scheduler:
   core_method: multistep #step, multistep and Exponential support
   gamma: 0.1
-  step_size: [15, 30]
+  step_size: [ 15, 30 ]
 
