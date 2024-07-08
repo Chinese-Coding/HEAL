@@ -5,6 +5,9 @@
 import torch
 import torch.nn as nn
 from collections import OrderedDict
+from opencood.logger import get_logger
+
+logger = get_logger()
 
 
 def fix_bn(m):
@@ -47,11 +50,17 @@ def check_trainable_module(model):
             has_trainable_list.append(name)
         if has_untrainable_params(module):
             has_untrainable_list.append(name)
+    logger.success(f'Those modules have trainable component: {list_to_string(has_trainable_list)}')
+    logger.success(f'Those modules have untrainable component: {list_to_string(has_untrainable_list)}')
 
-    print("=========Those modules have trainable component=========")
-    print(*has_trainable_list, sep='\n', end='\n\n')
-    print("=========Those modules have untrainable component=========")
-    print(*has_untrainable_list, sep='\n', end='\n\n')
+    # print("=========Those modules have trainable component=========")
+    # print(*has_trainable_list, sep='\n', end='\t')
+    # print("=========Those modules have untrainable component=========")
+    # print(*has_untrainable_list, sep='\n', end='\n\n')
+
+
+def list_to_string(l) -> str:
+    return '\n'.join(l) + '  '
 
 
 def weight_init(m):

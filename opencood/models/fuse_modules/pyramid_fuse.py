@@ -9,6 +9,9 @@ from opencood.models.fuse_modules.fusion_in_one import regroup
 from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
 from opencood.models.sub_modules.resblock import ResNetModified, Bottleneck
 from opencood.models.sub_modules.torch_transformation_utils import warp_affine_simple
+from opencood.logger import get_logger
+
+logger = get_logger()
 
 
 def weighted_fuse(x, score, record_len, affine_matrix, align_corners):
@@ -76,15 +79,12 @@ class PyramidFusion(ResNetBEVBackbone):
                                          groups=32,
                                          width_per_group=4)
         self.align_corners = model_cfg.get('align_corners', False)
-        print('Align corners: ', self.align_corners)
+        # print('Align corners: ', self.align_corners)
+        logger.success(f'Align corners: {self.align_corners}')
 
         # add single supervision head
         for i in range(self.num_levels):
-            setattr(
-                self,
-                f"single_head_{i}",
-                nn.Conv2d(self.model_cfg["num_filters"][i], 1, kernel_size=1),
-            )
+            setattr(self, f"single_head_{i}", nn.Conv2d(self.model_cfg["num_filters"][i], 1, kernel_size=1))
 
     def forward_single(self, spatial_features):
         """

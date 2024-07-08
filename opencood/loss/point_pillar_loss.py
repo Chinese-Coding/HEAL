@@ -6,10 +6,12 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from opencood.logger import get_logger
 
 from opencood.data_utils.post_processor.voxel_postprocessor import VoxelPostprocessor
 from opencood.utils.common_utils import limit_period
 
+logger = get_logger()
 
 class PointPillarLoss(nn.Module):
     def __init__(self, args):
@@ -182,20 +184,20 @@ class PointPillarLoss(nn.Module):
         dir_loss = self.loss_dict.get('dir_loss', 0)
         iou_loss = self.loss_dict.get('iou_loss', 0)
 
-        print("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
-              " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f" % (
-                  epoch, batch_id + 1, batch_len, suffix,
-                  total_loss, cls_loss, reg_loss, dir_loss, iou_loss))
+        # print("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
+        #       " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f" % (
+        #           epoch, batch_id + 1, batch_len, suffix,
+        #           total_loss, cls_loss, reg_loss, dir_loss, iou_loss))
+        logger.info("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
+                    " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f" % (
+                        epoch, batch_id + 1, batch_len, suffix,
+                        total_loss, cls_loss, reg_loss, dir_loss, iou_loss))
 
         if not writer is None:
-            writer.add_scalar('Regression_loss' + suffix, reg_loss,
-                              epoch * batch_len + batch_id)
-            writer.add_scalar('Confidence_loss' + suffix, cls_loss,
-                              epoch * batch_len + batch_id)
-            writer.add_scalar('Dir_loss' + suffix, dir_loss,
-                              epoch * batch_len + batch_id)
-            writer.add_scalar('Iou_loss' + suffix, iou_loss,
-                              epoch * batch_len + batch_id)
+            writer.add_scalar('Regression_loss' + suffix, reg_loss, epoch * batch_len + batch_id)
+            writer.add_scalar('Confidence_loss' + suffix, cls_loss, epoch * batch_len + batch_id)
+            writer.add_scalar('Dir_loss' + suffix, dir_loss, epoch * batch_len + batch_id)
+            writer.add_scalar('Iou_loss' + suffix, iou_loss, epoch * batch_len + batch_id)
 
 
 def one_hot_f(tensor, num_bins, dim=-1, on_value=1.0, dtype=torch.float32):

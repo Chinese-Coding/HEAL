@@ -5,7 +5,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from opencood.logger import get_logger
+
 from opencood.loss.point_pillar_loss import PointPillarLoss
+
+logger = get_logger()
 
 class PointPillarDepthLoss(PointPillarLoss):
     def __init__(self, args):
@@ -81,7 +85,11 @@ class PointPillarDepthLoss(PointPillarLoss):
         depth_loss = self.loss_dict.get('depth_loss', 0)
 
 
-        print("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
+        # print("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
+        #       " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f || Depth Loss: %.4f" % (
+        #           epoch, batch_id + 1, batch_len, suffix,
+        #           total_loss, cls_loss, reg_loss, dir_loss, iou_loss, depth_loss))
+        logger.info("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
               " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f || Depth Loss: %.4f" % (
                   epoch, batch_id + 1, batch_len, suffix,
                   total_loss, cls_loss, reg_loss, dir_loss, iou_loss, depth_loss))

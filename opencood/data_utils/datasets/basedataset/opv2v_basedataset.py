@@ -13,7 +13,7 @@ import h5py
 import numpy as np
 from PIL import Image
 from torch.utils.data import Dataset
-
+from opencood.logger import get_logger
 import opencood.utils.pcd_utils as pcd_utils
 from opencood.data_utils.augmentor.data_augmentor import DataAugmentor
 from opencood.data_utils.post_processor import build_postprocessor
@@ -21,6 +21,8 @@ from opencood.data_utils.pre_processor import build_preprocessor
 from opencood.hypes_yaml.yaml_utils import load_yaml
 from opencood.utils.camera_utils import load_camera_data
 from opencood.utils.transformation_utils import x1_to_x2
+
+logger = get_logger()
 
 
 class OPV2VBaseDataset(Dataset):
@@ -36,7 +38,8 @@ class OPV2VBaseDataset(Dataset):
         self.data_augmentor = DataAugmentor(params['data_augment'], train) if 'data_augment' in params else None
 
         root_dir = params['root_dir'] if self.train else params['validate_dir']
-        print("Dataset dir:", root_dir)
+        # print("Dataset dir:", root_dir)
+        logger.success(f'Dataset dir: {root_dir}')
 
         self.max_cav = 5 if 'train_params' not in params or 'max_cav' not in params['train_params'] \
             else params['train_params']['max_cav']
@@ -112,7 +115,8 @@ class OPV2VBaseDataset(Dataset):
             # loop over all CAV data
             for (j, cav_id) in enumerate(cav_list):
                 if j > self.max_cav - 1:
-                    print(f'\033[93m[WARNING]\033[0m In {scenario_folder}, there are too many cavs reinitialize.')
+                    # print(f'\033[93m[WARNING]\033[0m In {scenario_folder}, there are too many cavs reinitialize.')
+                    logger.warning(f'In {scenario_folder}, there are too many cavs reinitialize.')
                     break
                 self.scenario_database[i][cav_id] = OrderedDict()
 
@@ -174,7 +178,8 @@ class OPV2VBaseDataset(Dataset):
                         self.len_record.append(prev_last + len(timestamps))
                 else:
                     self.scenario_database[i][cav_id]['ego'] = False
-        print(f"len: {self.len_record[-1]}\n")
+        # print(f"len: {self.len_record[-1]}\n")
+        logger.success(f'len: {self.len_record[-1]}')
 
     def retrieve_base_data(self, idx):
         """

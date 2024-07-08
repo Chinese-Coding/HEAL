@@ -11,19 +11,24 @@ from datetime import datetime
 import shutil
 import torch
 import torch.optim as optim
+from opencood.logger import get_logger
+
+logger = get_logger()
+
 
 def backup_script(full_path, folders_to_save=["models", "data_utils", "utils", "loss"]):
     target_folder = os.path.join(full_path, 'scripts')
     if not os.path.exists(target_folder):
         if not os.path.exists(target_folder):
             os.mkdir(target_folder)
-    
+
     current_path = os.path.dirname(__file__)  # __file__ refer to this file, then the dirname is "?/tools"
 
     for folder_name in folders_to_save:
         ttarget_folder = os.path.join(target_folder, folder_name)
         source_folder = os.path.join(current_path, f'../{folder_name}')
         shutil.copytree(source_folder, ttarget_folder)
+
 
 def check_missing_key(model_state_dict, ckpt_state_dict):
     checkpoint_keys = set(ckpt_state_dict.keys())
@@ -35,17 +40,18 @@ def check_missing_key(model_state_dict, ckpt_state_dict):
     missing_key_modules = set([keyname.split('.')[0] for keyname in missing_keys])
     extra_key_modules = set([keyname.split('.')[0] for keyname in extra_keys])
 
-    print("------ Loading Checkpoint ------")
-    if len(missing_key_modules) == 0 and len(extra_key_modules) ==0:
+    # print("------ Loading Checkpoint ------")
+    logger.success('Loading Checkpoint')
+    if len(missing_key_modules) == 0 and len(extra_key_modules) == 0:
         return
 
     print("Missing keys from ckpt:")
-    print(*missing_key_modules,sep='\n',end='\n\n')
+    print(*missing_key_modules, sep='\n', end='\n\n')
     # print(*missing_keys,sep='\n',end='\n\n')
 
     print("Extra keys from ckpt:")
-    print(*extra_key_modules,sep='\n',end='\n\n')
-    print(*extra_keys,sep='\n',end='\n\n')
+    print(*extra_key_modules, sep='\n', end='\n\n')
+    print(*extra_keys, sep='\n', end='\n\n')
 
     print("You can go to tools/train_utils.py to print the full missing key name!")
     print("--------------------------------")
@@ -84,9 +90,11 @@ def load_saved_model(saved_path, model):
     file_list = glob.glob(os.path.join(saved_path, 'net_epoch_bestval_at*.pth'))
     if file_list:
         assert len(file_list) == 1
-        print("resuming best validation model at epoch %d" % \
-                eval(file_list[0].split("/")[-1].rstrip(".pth").lstrip("net_epoch_bestval_at")))
-        loaded_state_dict = torch.load(file_list[0] , map_location='cpu')
+        logger.success(
+            f'resuming best validation model at epoch {eval(file_list[0].split("/")[-1].rstrip(".pth").lstrip("net_epoch_bestval_at"))}')
+        # print("resuming best validation model at epoch %d" % \
+        #       eval(file_list[0].split("/")[-1].rstrip(".pth").lstrip("net_epoch_bestval_at")))
+        loaded_state_dict = torch.load(file_list[0], map_location='cpu')
         check_missing_key(model.state_dict(), loaded_state_dict)
         model.load_state_dict(loaded_state_dict, strict=False)
         return eval(file_list[0].split("/")[-1].rstrip(".pth").lstrip("net_epoch_bestval_at")), model
@@ -95,7 +103,7 @@ def load_saved_model(saved_path, model):
     if initial_epoch > 0:
         print('resuming by loading epoch %d' % initial_epoch)
         loaded_state_dict = torch.load(os.path.join(saved_path,
-                         'net_epoch%d.pth' % initial_epoch), map_location='cpu')
+                                                    'net_epoch%d.pth' % initial_epoch), map_location='cpu')
         check_missing_key(model.state_dict(), loaded_state_dict)
         model.load_state_dict(loaded_state_dict, strict=False)
 
@@ -132,8 +140,6 @@ def setup_train(hypes):
         save_name = os.path.join(full_path, 'config.yaml')
         with open(save_name, 'w') as outfile:
             yaml.dump(hypes, outfile)
-
-        
 
     return full_path
 
@@ -226,12 +232,9 @@ def setup_optimizer(hypes, model):
     if not optimizer_method:
         raise ValueError('{} is not supported'.format(method_dict['name']))
     if 'args' in method_dict:
-        return optimizer_method(model.parameters(),
-                                lr=method_dict['lr'],
-                                **method_dict['args'])
+        return optimizer_method(model.parameters(), lr=method_dict['lr'], **method_dict['args'])
     else:
-        return optimizer_method(model.parameters(),
-                                lr=method_dict['lr'])
+        return optimizer_method(model.parameters(), lr=method_dict['lr'])
 
 
 def setup_lr_schedular(hypes, optimizer, init_epoch=None):
@@ -247,7 +250,6 @@ def setup_lr_schedular(hypes, optimizer, init_epoch=None):
     """
     lr_schedule_config = hypes['lr_scheduler']
     last_epoch = init_epoch if init_epoch is not None else 0
-    
 
     if lr_schedule_config['core_method'] == 'step':
         from torch.optim.lr_scheduler import StepLR
@@ -259,9 +261,7 @@ def setup_lr_schedular(hypes, optimizer, init_epoch=None):
         from torch.optim.lr_scheduler import MultiStepLR
         milestones = lr_schedule_config['step_size']
         gamma = lr_schedule_config['gamma']
-        scheduler = MultiStepLR(optimizer,
-                                milestones=milestones,
-                                gamma=gamma)
+        scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
 
     else:
         from torch.optim.lr_scheduler import ExponentialLR
@@ -280,7 +280,6 @@ def to_device(inputs, device):
     elif isinstance(inputs, dict):
         return {k: to_device(v, device) for k, v in inputs.items()}
     else:
-        if isinstance(inputs, int) or isinstance(inputs, float) \
-                or isinstance(inputs, str) or not hasattr(inputs, 'to'):
+        if isinstance(inputs, int) or isinstance(inputs, float) or isinstance(inputs, str) or not hasattr(inputs, 'to'):
             return inputs
         return inputs.to(device, non_blocking=True)
