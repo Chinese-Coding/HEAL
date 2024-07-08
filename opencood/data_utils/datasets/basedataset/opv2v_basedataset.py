@@ -48,8 +48,8 @@ class OPV2VBaseDataset(Dataset):
         self.load_camera_file = True if 'camera' in params['input_source'] else False
         self.load_depth_file = True if 'depth' in params['input_source'] else False
 
-        self.label_type = params['label_type']  # 'lidar' or 'camera'
-        self.generate_object_center = self.generate_object_center_lidar if self.label_type == "lidar" \
+        # 'lidar' or 'camera'
+        self.generate_object_center = self.generate_object_center_lidar if params['label_type'] == "lidar" \
             else self.generate_object_center_camera
         # will it follows 'self.generate_object_center' when 'self.generate_object_center' change?
         self.generate_object_center_single = self.generate_object_center
@@ -162,7 +162,6 @@ class OPV2VBaseDataset(Dataset):
                     # load extra data
                     for file_extension in self.add_data_extension:
                         file_name = os.path.join(cav_path, timestamp + '_' + file_extension)
-
                         self.scenario_database[i][cav_id][timestamp][file_extension] = file_name
 
                 # Assume all cavs will have the same timestamps length. Thus
@@ -208,8 +207,7 @@ class OPV2VBaseDataset(Dataset):
         timestamp_index = idx if scenario_index == 0 else \
             idx - self.len_record[scenario_index - 1]
         # retrieve the corresponding timestamp key
-        timestamp_key = self.return_timestamp_key(scenario_database,
-                                                  timestamp_index)
+        timestamp_key = self.return_timestamp_key(scenario_database,timestamp_index)
         data = OrderedDict()
         # load files for all CAVs
         for cav_id, cav_content in scenario_database.items():
@@ -264,6 +262,9 @@ class OPV2VBaseDataset(Dataset):
                     data[cav_id][file_extension] = load_yaml(cav_content[timestamp_key][file_extension])
                 else:
                     data[cav_id][file_extension] = cv2.imread(cav_content[timestamp_key][file_extension])
+                    if data[cav_id][file_extension] is None:
+                        logger.error(f'Failed to read the image for {cav_id} with extension {file_extension} '
+                                     f'from {cav_content[timestamp_key][file_extension]}')
 
         return data
 
@@ -438,9 +439,7 @@ class OPV2VBaseDataset(Dataset):
         object_ids : list
             Length is number of bbx in current sample.
         """
-        return self.post_processor.generate_visible_object_center(
-            cav_contents, reference_lidar_pose
-        )
+        return self.post_processor.generate_visible_object_center(cav_contents, reference_lidar_pose)
 
     def get_ext_int(self, params, camera_id):
         camera_coords = np.array(params["camera%d" % camera_id]["cords"]).astype(

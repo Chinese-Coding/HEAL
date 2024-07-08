@@ -59,8 +59,8 @@ def check_trainable_module(model):
     # print(*has_untrainable_list, sep='\n', end='\n\n')
 
 
-def list_to_string(l) -> str:
-    return '\n'.join(l) + '  '
+def list_to_string(l: list) -> str:
+    return '  '.join(l)
 
 
 def weight_init(m):

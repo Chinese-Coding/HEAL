@@ -216,10 +216,11 @@ class LiftSplatShoot(nn.Module):
         return final  # final: 4 x 64 x 240 x 240  # B, C, H, W
 
     def get_voxels(self, x, rots, trans, intrins, post_rots, post_trans):
-        geom = self.get_geometry(rots, trans, intrins, post_rots,
-                                 post_trans)  # 像素坐标到自车中坐标的映射关系 geom: B x N x D x H x W x 3 (4 x N x 42 x 16 x 22 x 3)
-        x_img, depth_items = self.get_cam_feats(
-            x)  # 提取图像特征并预测深度编码 x: B x N x D x fH x fW x C(4 x N x 42 x 16 x 22 x 64)
+        # 像素坐标到自车中坐标的映射关系 geom: B x N x D x H x W x 3 (4 x N x 42 x 16 x 22 x 3)
+        geom = self.get_geometry(rots, trans, intrins, post_rots, post_trans)
+
+        # 提取图像特征并预测深度编码 x: B x N x D x fH x fW x C(4 x N x 42 x 16 x 22 x 64)
+        x_img, depth_items = self.get_cam_feats(x)
         x = self.voxel_pooling(geom, x_img)  # x: 4 x 64 x 240 x 240
 
         return x, depth_items

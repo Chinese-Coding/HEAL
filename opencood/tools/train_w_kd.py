@@ -3,19 +3,17 @@
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
 import argparse
+import importlib
 import os
 import statistics
 
 import torch
-from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
+from torch.utils.data import DataLoader
 
-import importlib
 import opencood.hypes_yaml.yaml_utils as yaml_utils
-from opencood.tools import train_utils
 from opencood.data_utils.datasets import build_dataset
-
-from icecream import ic
+from opencood.tools import train_utils
 
 
 def train_parser():

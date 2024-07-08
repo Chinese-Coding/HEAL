@@ -45,16 +45,23 @@ def check_missing_key(model_state_dict, ckpt_state_dict):
     if len(missing_key_modules) == 0 and len(extra_key_modules) == 0:
         return
 
-    print("Missing keys from ckpt:")
-    print(*missing_key_modules, sep='\n', end='\n\n')
+    # print("Missing keys from ckpt:")
+    # print(*missing_key_modules, sep='\n', end='\n\n')
     # print(*missing_keys,sep='\n',end='\n\n')
+    logger.success(f'Missing keys from ckpt: {list_to_string(missing_key_modules)}')
 
-    print("Extra keys from ckpt:")
-    print(*extra_key_modules, sep='\n', end='\n\n')
-    print(*extra_keys, sep='\n', end='\n\n')
+    #print("Extra keys from ckpt:")
+    #print(*extra_key_modules, sep='\n', end='\n\n')
+    #print(*extra_keys, sep='\n', end='\n\n')
+    logger.success(f'Extra keys from ckpt: {list_to_string(extra_key_modules)}\n{list_to_string(extra_keys)}')
 
-    print("You can go to tools/train_utils.py to print the full missing key name!")
-    print("--------------------------------")
+    # print("You can go to tools/train_utils.py to print the full missing key name!")
+    logger.success('You can go to tools/train_utils.py to print the full missing key name!\n')
+    # print("--------------------------------")
+
+
+def list_to_string(l: list) -> str:
+    return '  '.join(l)
 
 
 def load_saved_model(saved_path, model):
@@ -101,7 +108,8 @@ def load_saved_model(saved_path, model):
 
     initial_epoch = findLastCheckpoint(saved_path)
     if initial_epoch > 0:
-        print('resuming by loading epoch %d' % initial_epoch)
+        logger.success(f'resuming by loading epoch {initial_epoch}')
+        # print('resuming by loading epoch %d' % initial_epoch)
         loaded_state_dict = torch.load(os.path.join(saved_path,
                                                     'net_epoch%d.pth' % initial_epoch), map_location='cpu')
         check_missing_key(model.state_dict(), loaded_state_dict)

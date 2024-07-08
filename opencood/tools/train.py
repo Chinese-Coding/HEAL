@@ -249,4 +249,6 @@ def main():
 
 if __name__ == '__main__':
     logger = get_logger()
+    # 设置可见的 GPU, 因为实验室只有两块 GPU, 但是有两个同学在用, 所以分配了一下
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     main()

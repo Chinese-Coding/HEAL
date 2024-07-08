@@ -67,7 +67,7 @@ def getLateheterFusionDataset(cls):
                     setattr(self, f"data_aug_conf_{modality_name}", modal_setting['data_aug_conf'])
 
                 else:
-                    raise ("Not support this type of sensor")
+                    raise "Not support this type of sensor"
 
             self.reinitialize()
 
