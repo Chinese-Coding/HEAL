@@ -15,41 +15,46 @@ class ResNetBEVBackbone(nn.Module):
     """
     TODO: 这个类应该好好看看, 真的没看明白......
     """
-    def __init__(self, model_cfg, input_channels=64):
+
+    def __init__(self, model_cfg):
         super().__init__()
-        self.model_cfg = model_cfg
+        """
+        一些简单的参数配置
+        
+        如果在模型参数中定义了层数, 那么就应该校验一下层参数列表的长度是否等于层数
+        """
+        if 'layer_nums' in model_cfg:
+            assert len(model_cfg['layer_nums']) == \
+                   len(model_cfg['layer_strides']) == \
+                   len(model_cfg['num_filters'])
 
-        if 'layer_nums' in self.model_cfg:
-
-            assert len(self.model_cfg['layer_nums']) == \
-                   len(self.model_cfg['layer_strides']) == \
-                   len(self.model_cfg['num_filters'])
-
-            layer_nums = self.model_cfg['layer_nums']
-            layer_strides = self.model_cfg['layer_strides']
-            num_filters = self.model_cfg['num_filters']
+            layer_nums = model_cfg['layer_nums']
+            layer_strides = model_cfg['layer_strides']
+            num_filters = model_cfg['num_filters']
         else:
             layer_nums = layer_strides = num_filters = []
 
-        if 'upsample_strides' in self.model_cfg:
-            assert len(self.model_cfg['upsample_strides']) \
-                   == len(self.model_cfg['num_upsample_filter'])
+        if 'upsample_strides' in model_cfg:
+            assert len(model_cfg['upsample_strides']) == len(model_cfg['num_upsample_filter'])
 
-            num_upsample_filters = self.model_cfg['num_upsample_filter']
-            upsample_strides = self.model_cfg['upsample_strides']
-
+            num_upsample_filters = model_cfg['num_upsample_filter']
+            upsample_strides = model_cfg['upsample_strides']
         else:
             upsample_strides = num_upsample_filters = []
 
+        """
+        开始定义网络
+        """
         self.resnet = ResNetModified(BasicBlock, layer_nums, layer_strides, num_filters,
                                      inplanes=model_cfg.get('inplanes', 64))
 
         # 创建反卷积层 TODO: 什么是反卷积层...... 又是一个复杂的概念......
-        num_levels = len(layer_nums)
+        # GPT: 反卷积层用于将低分辨率的特征图转换为高分辨率，这在目标检测、语义分割等任务中很常见
+        # num_levels = len(layer_nums)
         self.num_levels = len(layer_nums)
-        self.deblocks = nn.ModuleList()
+        self.deblocks = nn.ModuleList()  # deblocks = deconvolution blocks (反卷积块或上采样块)
 
-        for idx in range(num_levels):
+        for idx in range(self.num_levels):
             if len(upsample_strides) > 0:
                 stride = upsample_strides[idx]
                 # 将 if 语句里面的公共部分提取一下
@@ -68,7 +73,7 @@ class ResNetBEVBackbone(nn.Module):
 
         # GPT: 计算上采样滤波器的总通道数 c_in，如果上采样步长的数量多于层数，则添加额外的反卷积层。
         c_in = sum(num_upsample_filters)
-        if len(upsample_strides) > num_levels:
+        if len(upsample_strides) > self.num_levels:
             self.deblocks.append(nn.Sequential(
                 nn.ConvTranspose2d(c_in, c_in, upsample_strides[-1], stride=upsample_strides[-1], bias=False),
                 nn.BatchNorm2d(c_in, eps=1e-3, momentum=0.01), nn.ReLU()))

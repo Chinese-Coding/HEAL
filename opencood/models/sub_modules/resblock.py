@@ -133,7 +133,7 @@ class ResNetModified(nn.Module):
                  replace_stride_with_dilation: Optional[List[bool]] = None,
                  norm_layer: Optional[Callable[..., nn.Module]] = None,
                  inplanes=64) -> None:
-        super(ResNetModified, self).__init__()
+        super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer

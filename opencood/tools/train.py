@@ -90,6 +90,7 @@ def main():
         logger.error('cuda is not available. Please check.')
         exit(-1)
     logger.success(f'model 类型: {type(model)}')
+    logger.success(f'loss 类型: {type(criterion)}')
 
     # record training
     writer = SummaryWriter(saved_path)
@@ -110,10 +111,10 @@ def main():
             logger.success(f'learning rate {param_group["lr"]}')
 
         # the model will be evaluation mode during validation
-        model.train()
+        model.train() # Sets the module in training mode
         try:  # heter_model stage2
             model.model_train_init()
-        except:
+        except AttributeError:
             # print("No model_train_init function")
             logger.error('No model_train_init function')
 

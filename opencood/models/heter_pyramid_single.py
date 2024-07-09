@@ -85,7 +85,7 @@ class HeterPyramidSingle(nn.Module):
         # BIN_NUM = 2
         self.dir_head = nn.Conv2d(args['in_head'], args['dir_args']['num_bins'] * args['anchor_number'], kernel_size=1)
 
-        self.model_train_init()
+        # self.model_train_init() # TODO: 在主函数中已经调用, 这里有必要再调用一次吗?
         # check again which module is not fixed.
         check_trainable_module(self)
 

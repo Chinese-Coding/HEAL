@@ -66,7 +66,7 @@ def check_missing_key(model_state_dict: dict, ckpt_state_dict: dict):
     logger.success(f'Extra keys from ckpt: {set_to_string(extra_key_modules)}')
     logger.info(set_to_string(extra_keys))
 
-    logger.success('You can go to tools/train_utils.py to print the full missing key name!\n')
+    logger.success('You can go to tools/train_utils.py to print the full missing key name!')
 
 
 def load_saved_model(saved_path: str, model):

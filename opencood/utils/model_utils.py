@@ -23,6 +23,9 @@ def unfix_bn(m):
 
 
 def has_trainable_params(module: torch.nn.Module) -> bool:
+    """
+    用于判断给定的 module 是否包含可训练的参数或在训练模式下的 BatchNorm 层
+    """
     any_require_grad = any(p.requires_grad for p in module.parameters())
     any_bn_in_train_mode = any(m.training for m in module.modules() if
                                isinstance(m, (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)))
@@ -30,33 +33,35 @@ def has_trainable_params(module: torch.nn.Module) -> bool:
 
 
 def has_untrainable_params(module: torch.nn.Module) -> bool:
+    """
+    用于判断给定的 module 是否包含不可训练的参数或在评估模式下的 BatchNorm 层
+    """
     any_not_require_grad = any((not p.requires_grad) for p in module.parameters())
     any_bn_in_eval_mode = any((not m.training) for m in module.modules() if
                               isinstance(m, (torch.nn.BatchNorm1d, torch.nn.BatchNorm2d, torch.nn.BatchNorm3d)))
     return any_not_require_grad or any_bn_in_eval_mode
 
 
-def check_trainable_module(model):
+def check_trainable_module(model: nn.Module):
+    """
+    用于检查整个模型中各个模块的可训练性和不可训练性
+    """
     appeared_module_list = []
-    has_trainable_list = []
-    has_untrainable_list = []
+    trainable_list = []
+    untrainable_list = []
     for name, module in model.named_modules():
-        if any([name.startswith(appeared_module_name) for appeared_module_name in
-                appeared_module_list]) or name == '':  # the whole model has name ''
+        # the whole model has name ''
+        if any([name.startswith(appeared_module_name) for appeared_module_name in appeared_module_list]) or name == '':
             continue
         appeared_module_list.append(name)
 
         if has_trainable_params(module):
-            has_trainable_list.append(name)
+            trainable_list.append(name)
         if has_untrainable_params(module):
-            has_untrainable_list.append(name)
-    logger.success(f'Those modules have trainable component: {list_to_string(has_trainable_list)}')
-    logger.success(f'Those modules have untrainable component: {list_to_string(has_untrainable_list)}')
+            untrainable_list.append(name)
 
-    # print("=========Those modules have trainable component=========")
-    # print(*has_trainable_list, sep='\n', end='\t')
-    # print("=========Those modules have untrainable component=========")
-    # print(*has_untrainable_list, sep='\n', end='\n\n')
+    logger.success(f'Those modules have trainable component: {list_to_string(trainable_list)}')
+    logger.success(f'Those modules have untrainable component: {list_to_string(untrainable_list)}')
 
 
 def list_to_string(l: list) -> str:

@@ -64,27 +64,23 @@ def weighted_fuse(x, score, record_len, affine_matrix, align_corners):
 
 
 class PyramidFusion(ResNetBEVBackbone):
-    def __init__(self, model_cfg, input_channels=64):
+    def __init__(self, model_cfg):
         """
         Do not downsample in the first layer.
         """
-        super().__init__(model_cfg, input_channels)
+        super().__init__(model_cfg)
         if model_cfg["resnext"]:
             Bottleneck.expansion = 1
-            self.resnet = ResNetModified(Bottleneck,
-                                         self.model_cfg['layer_nums'],
-                                         self.model_cfg['layer_strides'],
-                                         self.model_cfg['num_filters'],
-                                         inplanes=model_cfg.get('inplanes', 64),
-                                         groups=32,
-                                         width_per_group=4)
+            self.resnet = ResNetModified(Bottleneck, model_cfg['layer_nums'], model_cfg['layer_strides'],
+                                         model_cfg['num_filters'],   inplanes=model_cfg.get('inplanes', 64),
+                                         groups=32, width_per_group=4)
         self.align_corners = model_cfg.get('align_corners', False)
         # print('Align corners: ', self.align_corners)
         logger.success(f'Align corners: {self.align_corners}')
 
         # add single supervision head
         for i in range(self.num_levels):
-            setattr(self, f"single_head_{i}", nn.Conv2d(self.model_cfg["num_filters"][i], 1, kernel_size=1))
+            setattr(self, f"single_head_{i}", nn.Conv2d(model_cfg["num_filters"][i], 1, kernel_size=1))
 
     def forward_single(self, spatial_features):
         """
