@@ -4,6 +4,8 @@
 
 import glob
 import importlib
+from typing import overload
+
 import yaml
 import os
 import re
@@ -11,12 +13,17 @@ from datetime import datetime
 import shutil
 import torch
 import torch.optim as optim
+from torch import nn
+
 from opencood.logger import get_logger
 
 logger = get_logger()
 
 
-def backup_script(full_path, folders_to_save=["models", "data_utils", "utils", "loss"]):
+def backup_script(full_path, folders_to_save=None):
+    if folders_to_save is None:
+        folders_to_save = ["models", "data_utils", "utils", "loss"]
+
     target_folder = os.path.join(full_path, 'scripts')
     if not os.path.exists(target_folder):
         if not os.path.exists(target_folder):
@@ -30,43 +37,41 @@ def backup_script(full_path, folders_to_save=["models", "data_utils", "utils", "
         shutil.copytree(source_folder, ttarget_folder)
 
 
-def check_missing_key(model_state_dict, ckpt_state_dict):
-    checkpoint_keys = set(ckpt_state_dict.keys())
+def check_missing_key(model_state_dict: dict, ckpt_state_dict: dict):
+    """
+    用于检查 model_state_dict (模型的) 和 ckpt_state_dict (检查点) 之间是否存在不匹配的键  (参数名称)
+    :param model_state_dict:
+    :param ckpt_state_dict:
+    :return:
+    """
     model_keys = set(model_state_dict.keys())
+    checkpoint_keys = set(ckpt_state_dict.keys())
 
+    # 丢失的 key 和多余的 key, 就是做两个集合的差值
     missing_keys = model_keys - checkpoint_keys
     extra_keys = checkpoint_keys - model_keys
 
     missing_key_modules = set([keyname.split('.')[0] for keyname in missing_keys])
     extra_key_modules = set([keyname.split('.')[0] for keyname in extra_keys])
 
-    # print("------ Loading Checkpoint ------")
     logger.success('Loading Checkpoint')
     if len(missing_key_modules) == 0 and len(extra_key_modules) == 0:
         return
 
-    # print("Missing keys from ckpt:")
-    # print(*missing_key_modules, sep='\n', end='\n\n')
-    # print(*missing_keys,sep='\n',end='\n\n')
-    logger.success(f'Missing keys from ckpt: {list_to_string(missing_key_modules)}')
+    def set_to_string(l: set) -> str:
+        return '  '.join(l)
 
-    #print("Extra keys from ckpt:")
-    #print(*extra_key_modules, sep='\n', end='\n\n')
-    #print(*extra_keys, sep='\n', end='\n\n')
-    logger.success(f'Extra keys from ckpt: {list_to_string(extra_key_modules)}\n{list_to_string(extra_keys)}')
+    logger.success(f'Missing keys from ckpt: {set_to_string(missing_key_modules)}')
 
-    # print("You can go to tools/train_utils.py to print the full missing key name!")
+    logger.success(f'Extra keys from ckpt: {set_to_string(extra_key_modules)}')
+    logger.info(set_to_string(extra_keys))
+
     logger.success('You can go to tools/train_utils.py to print the full missing key name!\n')
-    # print("--------------------------------")
 
 
-def list_to_string(l: list) -> str:
-    return '  '.join(l)
-
-
-def load_saved_model(saved_path, model):
+def load_saved_model(saved_path: str, model):
     """
-    Load saved model if exiseted
+    Load saved model if existed
 
     Parameters
     __________
@@ -82,7 +87,7 @@ def load_saved_model(saved_path, model):
     """
     assert os.path.exists(saved_path), '{} not found'.format(saved_path)
 
-    def findLastCheckpoint(save_dir):
+    def find_last_checkpoint(save_dir: str):
         file_list = glob.glob(os.path.join(save_dir, '*epoch*.pth'))
         if file_list:
             epochs_exist = []
@@ -94,31 +99,30 @@ def load_saved_model(saved_path, model):
             initial_epoch_ = 0
         return initial_epoch_
 
-    file_list = glob.glob(os.path.join(saved_path, 'net_epoch_bestval_at*.pth'))
-    if file_list:
-        assert len(file_list) == 1
-        logger.success(
-            f'resuming best validation model at epoch {eval(file_list[0].split("/")[-1].rstrip(".pth").lstrip("net_epoch_bestval_at"))}')
-        # print("resuming best validation model at epoch %d" % \
-        #       eval(file_list[0].split("/")[-1].rstrip(".pth").lstrip("net_epoch_bestval_at")))
-        loaded_state_dict = torch.load(file_list[0], map_location='cpu')
+    bestval_file_list = glob.glob(os.path.join(saved_path, 'net_epoch_bestval_at*.pth'))
+    if bestval_file_list:  # 如果找到了最好结果, 则从最好结果开始训练
+        assert len(bestval_file_list) == 1  # TODO: 最好的结果只能有一个?
+        # TODO: 这里可能有 bug
+        bestval_file = bestval_file_list[0]  # 这行代码看着有些多余, 实际上是为了增加可读性
+        epoch = int(bestval_file.split("/")[-1].rstrip(".pth").lstrip("net_epoch_bestval_at"))
+
+        logger.success(f'resuming best validation model at epoch {epoch}')
+        loaded_state_dict = torch.load(bestval_file_list[0], map_location='cpu')
         check_missing_key(model.state_dict(), loaded_state_dict)
         model.load_state_dict(loaded_state_dict, strict=False)
-        return eval(file_list[0].split("/")[-1].rstrip(".pth").lstrip("net_epoch_bestval_at")), model
+        return epoch, model
 
-    initial_epoch = findLastCheckpoint(saved_path)
+    initial_epoch = find_last_checkpoint(saved_path)
     if initial_epoch > 0:
         logger.success(f'resuming by loading epoch {initial_epoch}')
-        # print('resuming by loading epoch %d' % initial_epoch)
-        loaded_state_dict = torch.load(os.path.join(saved_path,
-                                                    'net_epoch%d.pth' % initial_epoch), map_location='cpu')
+        loaded_state_dict = torch.load(os.path.join(saved_path, f'net_epoch{initial_epoch}.pth'), map_location='cpu')
         check_missing_key(model.state_dict(), loaded_state_dict)
         model.load_state_dict(loaded_state_dict, strict=False)
 
     return initial_epoch, model
 
 
-def setup_train(hypes):
+def setup_train(hypes: dict):
     """
     Create folder for saved model based on current timestep and model name
 
@@ -152,6 +156,27 @@ def setup_train(hypes):
     return full_path
 
 
+@overload
+def create_model(backbone_name: str, backbone_config: dict) -> nn.Module:
+    model_filename = "opencood.models." + backbone_name
+    model_lib = importlib.import_module(model_filename)
+    model = None
+    target_model_name = backbone_name.replace('_', '')
+
+    for name, cls in model_lib.__dict__.items():
+        if name.lower() == target_model_name.lower():
+            model = cls
+            # TODO: 找到就直接 break?
+
+    if model is None:
+        logger.error(f'backbone not found in models folder. '
+                     f'Please make sure you have a python file named {model_filename} '
+                     f'and has a class called target_model_name ignoring upper/lower case')
+        exit(0)
+    instance = model(backbone_config)
+    return instance
+
+
 def create_model(hypes):
     """
     Import the module "models/[model_name].py
@@ -177,12 +202,12 @@ def create_model(hypes):
     for name, cls in model_lib.__dict__.items():
         if name.lower() == target_model_name.lower():
             model = cls
+            # TODO: 找到就直接 break?
 
     if model is None:
-        print('backbone not found in models folder. Please make sure you '
-              'have a python file named %s and has a class '
-              'called %s ignoring upper/lower case' % (model_filename,
-                                                       target_model_name))
+        logger.error(f'backbone not found in models folder. '
+                     f'Please make sure you have a python file named {model_filename} '
+                     f'and has a class called target_model_name ignoring upper/lower case')
         exit(0)
     instance = model(backbone_config)
     return instance

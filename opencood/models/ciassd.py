@@ -1,11 +1,10 @@
-import torch
-from torch import nn
 import numpy as np
+from torch import nn
 
+from opencood.models.sub_modules.cia_ssd_utils import SSFA, Head
+from opencood.models.sub_modules.height_compression import HeightCompression
 from opencood.models.sub_modules.mean_vfe import MeanVFE
 from opencood.models.sub_modules.sparse_backbone_3d import VoxelBackBone8x
-from opencood.models.sub_modules.height_compression import HeightCompression
-from opencood.models.sub_modules.cia_ssd_utils import SSFA, Head
 
 
 class CIASSD(nn.Module):

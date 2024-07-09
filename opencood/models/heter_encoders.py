@@ -74,7 +74,7 @@ class SECOND(nn.Module):
 
 class LiftSplatShoot(nn.Module):
     def __init__(self, args):
-        super(LiftSplatShoot, self).__init__()
+        super().__init__()
         self.grid_conf = args['grid_conf']  # 网格配置参数
         self.data_aug_conf = args['data_aug_conf']  # 数据增强配置参数
         dx, bx, nx = gen_dx_bx(self.grid_conf['xbound'], self.grid_conf['ybound'], self.grid_conf['zbound'])  # 划分网格
@@ -85,8 +85,8 @@ class LiftSplatShoot(nn.Module):
         self.depth_supervision = args['depth_supervision']
         self.downsample = args['img_downsample']  # 下采样倍数
         self.camC = args['img_features']  # 图像特征维度
-        self.frustum = self.create_frustum().clone().detach().requires_grad_(False).to(
-            torch.device("cuda"))  # frustum: DxfHxfWx3(41x8x16x3)
+        # frustum: DxfHxfWx3(41x8x16x3)
+        self.frustum = self.create_frustum().clone().detach().requires_grad_(False).to(torch.device("cuda"))
         self.use_quickcumsum = True
         self.D, _, _, _ = self.frustum.shape  # D: 41
         self.camera_encoder_type = args['camera_encoder']
@@ -107,14 +107,15 @@ class LiftSplatShoot(nn.Module):
                           dtype=torch.float).view(-1, 1, 1).expand(-1, fH, fW)
 
         D, _, _ = ds.shape  # D: 41 表示深度方向上网格的数量
-        xs = torch.linspace(0, ogfW - 1, fW, dtype=torch.float).view(1, 1, fW).expand(D, fH,
-                                                                                      fW)  # 在0到288上划分18个格子 xs: DxfHxfW(41x12x22)
-        ys = torch.linspace(0, ogfH - 1, fH, dtype=torch.float).view(1, fH, 1).expand(D, fH,
-                                                                                      fW)  # 在0到127上划分8个格子 ys: DxfHxfW(41x12x22)
+
+        # 在0到288上划分18个格子 xs: DxfHxfW(41x12x22)
+        xs = torch.linspace(0, ogfW - 1, fW, dtype=torch.float).view(1, 1, fW).expand(D, fH, fW)
+        # 在0到127上划分8个格子 ys: DxfHxfW(41x12x22)
+        ys = torch.linspace(0, ogfH - 1, fH, dtype=torch.float).view(1, fH, 1).expand(D, fH, fW)
 
         # D x H x W x 3
-        frustum = torch.stack((xs, ys, ds),
-                              -1)  # 堆积起来形成网格坐标, frustum[i,j,k,0]就是(i,j)位置，深度为k的像素的宽度方向上的栅格坐标   frustum: DxfHxfWx3
+        # 堆积起来形成网格坐标, frustum[i,j,k,0]就是(i,j)位置，深度为k的像素的宽度方向上的栅格坐标   frustum: DxfHxfWx3
+        frustum = torch.stack((xs, ys, ds), -1)
         return frustum
 
     def get_geometry(self, rots, trans, intrins, post_rots, post_trans):

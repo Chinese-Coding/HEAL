@@ -3,19 +3,19 @@ from functools import partial
 import spconv
 import torch.nn as nn
 
-try: # spconv1
+try:  # spconv1
     from spconv import SparseSequential, SubMConv3d, SparseConv3d, SparseInverseConv3d, SparseConvTensor
-except: # spconv2
-    from spconv.pytorch import  SparseSequential, SubMConv3d, SparseConv3d, SparseInverseConv3d, SparseConvTensor
+except:  # spconv2
+    from spconv.pytorch import SparseSequential, SubMConv3d, SparseConv3d, SparseInverseConv3d, SparseConvTensor
+
 
 def post_act_block(in_channels, out_channels, kernel_size, indice_key=None, stride=1, padding=0,
                    conv_type='subm', norm_fn=None):
-
     if conv_type == 'subm':
         conv = SubMConv3d(in_channels, out_channels, kernel_size, bias=False, indice_key=indice_key)
     elif conv_type == 'spconv':
         conv = SparseConv3d(in_channels, out_channels, kernel_size, stride=stride, padding=padding,
-                                   bias=False, indice_key=indice_key)
+                            bias=False, indice_key=indice_key)
     elif conv_type == 'inverseconv':
         conv = SparseInverseConv3d(in_channels, out_channels, kernel_size, indice_key=indice_key, bias=False)
     else:
@@ -78,7 +78,7 @@ class VoxelBackBone8x(nn.Module):
         self.conv_out = SparseSequential(
             # [200, 150, 5] -> [200, 150, 2]
             SparseConv3d(64, self.num_point_features, (3, 1, 1), stride=(2, 1, 1), padding=last_pad,
-                                bias=False, indice_key='spconv_down2'),
+                         bias=False, indice_key='spconv_down2'),
             norm_fn(self.num_point_features),
             nn.ReLU(),
         )
@@ -101,8 +101,7 @@ class VoxelBackBone8x(nn.Module):
             batch_dict:
                 encoded_spconv_tensor: sparse tensor
         """
-        voxel_features, voxel_coords = batch_dict['voxel_features'], \
-                                       batch_dict['voxel_coords']
+        voxel_features, voxel_coords = batch_dict['voxel_features'], batch_dict['voxel_coords']
         batch_size = batch_dict['batch_size']
         input_sp_tensor = SparseConvTensor(
             features=voxel_features,
@@ -110,9 +109,10 @@ class VoxelBackBone8x(nn.Module):
             spatial_shape=self.sparse_shape,
             batch_size=batch_size
         )
-
+        # TODO: 这里有 bug
+        print("Input shape:", input_sp_tensor.features.shape)
         x = self.conv_input(input_sp_tensor)
-
+        print("After conv_input shape:", x.features.shape)
         x_conv1 = self.conv1(x)
         x_conv2 = self.conv2(x_conv1)
         x_conv3 = self.conv3(x_conv2)

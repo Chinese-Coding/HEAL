@@ -2,15 +2,14 @@
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
-import torch
-import torch.nn as nn
-import numpy as np
-from icecream import ic
-import torchvision
-from collections import OrderedDict, Counter
-from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone 
-from opencood.models.sub_modules.downsample_conv import DownsampleConv
 import importlib
+from collections import OrderedDict
+
+import torch.nn as nn
+import torchvision
+
+from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
+from opencood.models.sub_modules.downsample_conv import DownsampleConv
 
 
 class HeterModelLate(nn.Module):
