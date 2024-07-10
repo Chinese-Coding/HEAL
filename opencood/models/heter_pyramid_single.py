@@ -3,18 +3,28 @@
 HEAL: An Extensible Framework for Open Heterogeneous Collaborative Perception 
 """
 
-import importlib
 from collections import OrderedDict
 
 import torch.nn as nn
 import torchvision
 
+from opencood.logger import get_logger
 from opencood.models.fuse_modules.pyramid_fuse import PyramidFusion
+from opencood.models.heter_encoders import LiftSplatShoot
+from opencood.models.heter_encoders import PointPillar
+from opencood.models.heter_encoders import SECOND
 from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
 from opencood.models.sub_modules.downsample_conv import DownsampleConv
 from opencood.models.sub_modules.feature_alignnet import AlignNet
 from opencood.utils.model_utils import check_trainable_module, fix_bn
 
+encoders = {
+    'second': SECOND,
+    'lift_splat_shoot': LiftSplatShoot,
+    'point_pillar': PointPillar
+}
+
+logger = get_logger()
 
 class HeterPyramidSingle(nn.Module):
     def __init__(self, args):
@@ -33,14 +43,23 @@ class HeterPyramidSingle(nn.Module):
             self.sensor_type_dict[modality_name] = sensor_name
 
             # import model
-            encoder_filename = "opencood.models.heter_encoders"
-            encoder_lib = importlib.import_module(encoder_filename)
-            encoder_class = None
-            target_model_name = model_setting['core_method'].replace('_', '')
+            # encoder_filename = "opencood.models.heter_encoders"
+            # encoder_lib = importlib.import_module(encoder_filename)
+            # encoder_class = None
+            # target_model_name = model_setting['core_method'].replace('_', '')
+            #
+            # for name, cls in encoder_lib.__dict__.items():
+            #     if name.lower() == target_model_name.lower():
+            #         encoder_class = cls
 
-            for name, cls in encoder_lib.__dict__.items():
-                if name.lower() == target_model_name.lower():
-                    encoder_class = cls
+            # TODO: 这样利用字典从 `opencood.models.heter_encoders` 中引入, 看起来有些死板, 但是 IDE 的代码提示变好了啊
+            #        也许将 `encoder` 再单独从这个文件里面提取出来比较好. 配置文件中 `encoder` 的命名方式最好和代码中的一样
+            try:
+                encoder_class = encoders[model_setting['core_method']]
+            except KeyError:
+                available_encoders = ', '.join(encoders.keys())
+                logger.error(f'不受支持的 encoder. 新选择的 encoder: {model_setting["core_method"]}. 可用的 encoders: {available_encoders}')
+                exit(-1)
 
             # build encoder
             setattr(self, f"encoder_{modality_name}", encoder_class(model_setting['encoder_args']))

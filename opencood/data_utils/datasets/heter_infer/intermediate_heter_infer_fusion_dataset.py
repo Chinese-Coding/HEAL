@@ -46,6 +46,7 @@ def getIntermediateheterinferFusionDataset(cls):
                 'm3': 'lidar',
                 'm4': 'camera',
             }
+            # TODO: 看看这里是什么意思?
             print("\n\nCaution: make sure your sensor type is consistent with:")
             print(self.sensor_type_dict)
             print(
@@ -75,6 +76,12 @@ def getIntermediateheterinferFusionDataset(cls):
             assert ego_id != -1
             assert len(ego_lidar_pose) > 0
 
+
+            input_list_m1 = [] # can contain lidar or camera
+            input_list_m2 = []
+            input_list_m3 = []
+            input_list_m4 = []
+
             agent_modality_list = []
             object_stack = []
             object_id_stack = []
@@ -85,6 +92,7 @@ def getIntermediateheterinferFusionDataset(cls):
             lidar_pose_list = []
             lidar_pose_clean_list = []
             cav_id_list = []
+            projected_lidar_clean_list = [] # disconet
 
             if self.visualize or self.kd_flag:
                 projected_lidar_stack = []

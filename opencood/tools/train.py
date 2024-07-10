@@ -52,8 +52,9 @@ def main():
     val_loader = DataLoader(opencood_validate_dataset, batch_size=hypes['train_params']['batch_size'],
                             num_workers=4, collate_fn=opencood_train_dataset.collate_batch_train,
                             shuffle=True, pin_memory=True, drop_last=True, prefetch_factor=2)
-
+    logger.success('---数据集加载完毕---')
     logger.success('Creating Model')
+    
     model = train_utils.create_model(hypes)
 
     # record lowest validation loss checkpoint.
@@ -183,6 +184,7 @@ def main():
 
         logger.success(f'Epoch [{epoch}/{epoches}], Train Time: {during_time:.2f} seconds')
         # scheduler.step(epoch)
+        logger.success(f'Dataset Building for {epoch + 1}')
         opencood_train_dataset.reinitialize()
 
     logger.success(f'Training Finished, checkpoints saved to {saved_path}')

@@ -72,7 +72,7 @@ class PyramidFusion(ResNetBEVBackbone):
         if model_cfg["resnext"]:
             Bottleneck.expansion = 1
             self.resnet = ResNetModified(Bottleneck, model_cfg['layer_nums'], model_cfg['layer_strides'],
-                                         model_cfg['num_filters'],   inplanes=model_cfg.get('inplanes', 64),
+                                         model_cfg['num_filters'], inplanes=model_cfg.get('inplanes', 64),
                                          groups=32, width_per_group=4)
         self.align_corners = model_cfg.get('align_corners', False)
         # print('Align corners: ', self.align_corners)

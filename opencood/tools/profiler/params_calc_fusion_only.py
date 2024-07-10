@@ -1,16 +1,14 @@
-from fvcore.nn import FlopCountAnalysis
-from fvcore.nn import flop_count_table
+import pickle
+import sys
+import time
+
+import numpy as np
+import torch
+
 import opencood.hypes_yaml.yaml_utils as yaml_utils
 from opencood.tools import train_utils
-import argparse
-import pickle
 from opencood.utils.common_utils import update_dict
-import importlib
-import time
-import sys
-import torch
-import numpy as np
-from icecream import ic 
+
 
 def train_parser():
     parser = argparse.ArgumentParser(description="Profiler.")

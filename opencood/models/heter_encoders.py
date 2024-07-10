@@ -47,7 +47,7 @@ class PointPillar(nn.Module):
 
 class SECOND(nn.Module):
     def __init__(self, args):
-        super(SECOND, self).__init__()
+        super().__init__()
         lidar_range = np.array(args['lidar_range'])
         grid_size = np.round((lidar_range[3:6] - lidar_range[:3]) / np.array(args['voxel_size'])).astype(np.int64)
         self.vfe = MeanVFE(args['mean_vfe'], args['mean_vfe']['num_point_features'])

@@ -96,10 +96,10 @@ class VoxelBackBone8x(nn.Module):
         input_sp_tensor = SparseConvTensor(features=voxel_features, indices=voxel_coords.int(),
                                            spatial_shape=self.sparse_shape, batch_size=batch_size)
         # TODO: 这里有 bug
-        print("Input shape:", input_sp_tensor.features.shape)
-        print(self.conv_input)
+        # print("Input shape:", input_sp_tensor.features.shape)
+        # print(self.conv_input)
         x = self.conv_input(input_sp_tensor)
-        print("After conv_input shape:", x.features.shape)
+        # print("After conv_input shape:", x.features.shape)
         x_conv1 = self.conv1(x)
         x_conv2 = self.conv2(x_conv1)
         x_conv3 = self.conv3(x_conv2)

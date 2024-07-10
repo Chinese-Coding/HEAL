@@ -208,12 +208,7 @@ class HeterPyramidCollab(nn.Module):
         # add croping information to collaboration module
 
         fused_feature, occ_outputs = self.pyramid_backbone.forward_collab(
-            heter_feature_2d,
-            record_len,
-            affine_matrix,
-            agent_modality_list,
-            self.cam_crop_info
-        )
+            heter_feature_2d, record_len, affine_matrix, agent_modality_list, self.cam_crop_info)
 
         if self.shrink_flag:
             fused_feature = self.shrink_conv(fused_feature)
