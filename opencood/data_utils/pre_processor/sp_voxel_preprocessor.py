@@ -9,7 +9,6 @@ import sys
 
 import numpy as np
 import torch
-from icecream import ic
 
 from opencood.data_utils.pre_processor.base_preprocessor import \
     BasePreprocessor

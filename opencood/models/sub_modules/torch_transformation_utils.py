@@ -4,11 +4,11 @@
 
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn.functional as F
-import numpy as np
-import matplotlib.pyplot as plt
-from icecream import ic
+
 
 def get_roi_and_cav_mask(shape, cav_mask, spatial_correction_matrix,
                          discrete_ratio, downsample_rate):

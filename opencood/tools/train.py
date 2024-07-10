@@ -54,7 +54,7 @@ def main():
                             shuffle=True, pin_memory=True, drop_last=True, prefetch_factor=2)
     logger.success('---数据集加载完毕---')
     logger.success('Creating Model')
-    
+
     model = train_utils.create_model(hypes)
 
     # record lowest validation loss checkpoint.
@@ -84,8 +84,11 @@ def main():
     # we assume gpu is necessary
     if torch.cuda.is_available():
         device = torch.device('cuda')
-        absolute_gup_index = int(os.environ["CUDA_VISIBLE_DEVICES"].split(",")[torch.cuda.current_device()])
-        logger.success(f'Using device: {device}, Using GPU index: {absolute_gup_index}')
+        if os.environ.get('CUDA_VISIBLE_DEVICES') is not None:
+            absolute_gup_index = int(os.environ["CUDA_VISIBLE_DEVICES"].split(",")[torch.cuda.current_device()])
+            logger.success(f'Using device: {device}, Using GPU index: {absolute_gup_index}')
+        else:
+            logger.success(f'Using device: {device}')
         model.to(device)
     else:
         logger.error('cuda is not available. Please check.')
@@ -112,7 +115,7 @@ def main():
             logger.success(f'learning rate {param_group["lr"]}')
 
         # the model will be evaluation mode during validation
-        model.train() # Sets the module in training mode
+        model.train()  # Sets the module in training mode
         try:  # heter_model stage2
             model.model_train_init()
         except AttributeError:
