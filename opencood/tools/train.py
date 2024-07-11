@@ -144,7 +144,7 @@ def main():
             optimizer.step()
 
             # torch.cuda.empty_cache()  # it will destroy memory buffer
-
+        logger.success('开始计算损失')
         if epoch % hypes['train_params']['save_freq'] == 0:
             torch.save(model.state_dict(), os.path.join(saved_path, 'net_epoch%d.pth' % (epoch + 1)))
 
@@ -152,7 +152,7 @@ def main():
             valid_ave_loss = []
 
             with torch.no_grad():
-                for i, batch_data in enumerate(val_loader):
+                for i, batch_data in tqdm(enumerate(val_loader), total=len(val_loader)):
                     if batch_data is None:
                         continue
                     model.zero_grad()
@@ -185,7 +185,7 @@ def main():
         during_time = (datetime.now() - epoch_start_time).total_seconds()
         epoch_times.append({epoch: during_time})
 
-        logger.success(f'Epoch [{epoch}/{epoches}], Train Time: {during_time:.2f} seconds')
+        logger.success(f'Epoch {epoch}, Train Time: {during_time:.2f} seconds')
         # scheduler.step(epoch)
         logger.success(f'Dataset Building for {epoch + 1}')
         opencood_train_dataset.reinitialize()

@@ -115,7 +115,6 @@ class OPV2VBaseDataset(Dataset):
             # loop over all CAV data
             for (j, cav_id) in enumerate(cav_list):
                 if j > self.max_cav - 1:
-                    # print(f'\033[93m[WARNING]\033[0m In {scenario_folder}, there are too many cavs reinitialize.')
                     logger.warning(f'In {scenario_folder}, there are too many cavs reinitialize.')
                     break
                 self.scenario_database[i][cav_id] = OrderedDict()
@@ -164,9 +163,8 @@ class OPV2VBaseDataset(Dataset):
                         file_name = os.path.join(cav_path, timestamp + '_' + file_extension)
                         self.scenario_database[i][cav_id][timestamp][file_extension] = file_name
 
-                # Assume all cavs will have the same timestamps length. Thus
-                # we only need to calculate for the first vehicle in the
-                # scene.
+                # Assume all cavs will have the same timestamps length.
+                # Thus  we only need to calculate for the first vehicle in the scene.
                 if j == 0:
                     # we regard the agent with the minimum id as the ego
                     self.scenario_database[i][cav_id]['ego'] = True
@@ -178,7 +176,7 @@ class OPV2VBaseDataset(Dataset):
                 else:
                     self.scenario_database[i][cav_id]['ego'] = False
         # print(f"len: {self.len_record[-1]}\n")
-        logger.success(f'len: {self.len_record[-1]}')
+        logger.success(f'数据集总长度 len: {self.len_record[-1]}')
 
     def retrieve_base_data(self, idx):
         """
@@ -204,10 +202,10 @@ class OPV2VBaseDataset(Dataset):
         scenario_database = self.scenario_database[scenario_index]
 
         # check the timestamp index
-        timestamp_index = idx if scenario_index == 0 else \
-            idx - self.len_record[scenario_index - 1]
+        timestamp_index = idx if scenario_index == 0 else idx - self.len_record[scenario_index - 1]
+
         # retrieve the corresponding timestamp key
-        timestamp_key = self.return_timestamp_key(scenario_database,timestamp_index)
+        timestamp_key = self.return_timestamp_key(scenario_database, timestamp_index)
         data = OrderedDict()
         # load files for all CAVs
         for cav_id, cav_content in scenario_database.items():
