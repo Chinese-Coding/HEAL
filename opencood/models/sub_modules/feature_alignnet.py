@@ -2,18 +2,17 @@
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
 from opencood.models.sub_modules.feature_alignnet_modules import SCAligner, Res1x1Aligner, \
-    Res3x3Aligner, Res3x3Aligner, CBAM, ConvNeXt, FANet, SDTAAgliner
+    Res3x3Aligner, CBAM, ConvNeXt, FANet, SDTAAgliner
 
 
 class AlignNet(nn.Module):
     def __init__(self, args):
         super().__init__()
         model_name = args['core_method']
-        
+        # TODO: 这里换成 map 的写法会不会更好?
         if model_name == "scaligner":
             self.channel_align = SCAligner(args['args'])
         elif model_name == "resnet1x1":

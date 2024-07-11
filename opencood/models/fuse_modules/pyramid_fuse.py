@@ -2,16 +2,16 @@
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
-import numpy as np
 import torch
 import torch.nn as nn
 
-from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
-from opencood.models.sub_modules.resblock import ResNetModified, Bottleneck, BasicBlock
 from opencood.models.fuse_modules.fusion_in_one import regroup
-from opencood.models.sub_modules.torch_transformation_utils import \
-    warp_affine_simple
-from opencood.visualization.debug_plot import plot_feature
+from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
+from opencood.models.sub_modules.resblock import ResNetModified, Bottleneck
+from opencood.models.sub_modules.torch_transformation_utils import warp_affine_simple
+from opencood.logger import get_logger
+
+logger = get_logger()
 
 
 def weighted_fuse(x, score, record_len, affine_matrix, align_corners):
@@ -44,49 +44,43 @@ def weighted_fuse(x, score, record_len, affine_matrix, align_corners):
         N = record_len[b]
         score = split_score[b]
         t_matrix = affine_matrix[b][:N, :N, :, :]
-        i = 0 # ego
+        i = 0  # ego
         feature_in_ego = warp_affine_simple(batch_node_features[b],
-                                        t_matrix[i, :, :, :],
-                                        (H, W), align_corners=align_corners)
+                                            t_matrix[i, :, :, :],
+                                            (H, W), align_corners=align_corners)
         scores_in_ego = warp_affine_simple(split_score[b],
                                            t_matrix[i, :, :, :],
                                            (H, W), align_corners=align_corners)
         scores_in_ego.masked_fill_(scores_in_ego == 0, -float('inf'))
         scores_in_ego = torch.softmax(scores_in_ego, dim=0)
-        scores_in_ego = torch.where(torch.isnan(scores_in_ego), 
-                                    torch.zeros_like(scores_in_ego, device=scores_in_ego.device), 
+        scores_in_ego = torch.where(torch.isnan(scores_in_ego),
+                                    torch.zeros_like(scores_in_ego, device=scores_in_ego.device),
                                     scores_in_ego)
 
         out.append(torch.sum(feature_in_ego * scores_in_ego, dim=0))
     out = torch.stack(out)
-    
+
     return out
 
+
 class PyramidFusion(ResNetBEVBackbone):
-    def __init__(self, model_cfg, input_channels=64):
+    def __init__(self, model_cfg):
         """
         Do not downsample in the first layer.
         """
-        super().__init__(model_cfg, input_channels)
+        super().__init__(model_cfg)
         if model_cfg["resnext"]:
             Bottleneck.expansion = 1
-            self.resnet = ResNetModified(Bottleneck, 
-                                        self.model_cfg['layer_nums'],
-                                        self.model_cfg['layer_strides'],
-                                        self.model_cfg['num_filters'],
-                                        inplanes = model_cfg.get('inplanes', 64),
-                                        groups=32,
-                                        width_per_group=4)
+            self.resnet = ResNetModified(Bottleneck, model_cfg['layer_nums'], model_cfg['layer_strides'],
+                                         model_cfg['num_filters'], inplanes=model_cfg.get('inplanes', 64),
+                                         groups=32, width_per_group=4)
         self.align_corners = model_cfg.get('align_corners', False)
-        print('Align corners: ', self.align_corners)
-        
+        # print('Align corners: ', self.align_corners)
+        logger.success(f'Align corners: {self.align_corners}')
+
         # add single supervision head
         for i in range(self.num_levels):
-            setattr(
-                self,
-                f"single_head_{i}",
-                nn.Conv2d(self.model_cfg["num_filters"][i], 1, kernel_size=1),
-            )
+            setattr(self, f"single_head_{i}", nn.Conv2d(model_cfg["num_filters"][i], 1, kernel_size=1))
 
     def forward_single(self, spatial_features):
         """
@@ -100,8 +94,8 @@ class PyramidFusion(ResNetBEVBackbone):
         final_feature = self.decode_multiscale_feature(feature_list)
 
         return final_feature, occ_map_list
-    
-    def forward_collab(self, spatial_features, record_len, affine_matrix, agent_modality_list = None, cam_crop_info = None):
+
+    def forward_collab(self, spatial_features, record_len, affine_matrix, agent_modality_list=None, cam_crop_info=None):
         """
         spatial_features : torch.tensor
             [sum(record_len), C, H, W]
@@ -129,12 +123,11 @@ class PyramidFusion(ResNetBEVBackbone):
             cam_modality_set = set(cam_crop_info.keys())
             cam_agent_mask_dict = {}
             for cam_modality in cam_modality_set:
-                mask_list = [1 if x == cam_modality else 0 for x in agent_modality_list] 
+                mask_list = [1 if x == cam_modality else 0 for x in agent_modality_list]
                 mask_tensor = torch.tensor(mask_list, dtype=torch.bool)
                 cam_agent_mask_dict[cam_modality] = mask_tensor
 
                 # e.g. {m2: [0,0,0,1], m4: [0,1,0,0]}
-
 
         feature_list = self.get_multiscale_feature(spatial_features)
         fused_feature_list = []
@@ -148,21 +141,24 @@ class PyramidFusion(ResNetBEVBackbone):
                 cam_crop_mask = torch.ones_like(occ_map, device=occ_map.device)
                 _, _, H, W = cam_crop_mask.shape
                 for cam_modality in cam_modality_set:
-                    crop_H = H / cam_crop_info[cam_modality][f"crop_ratio_H_{cam_modality}"] - 4 # There may be unstable response values at the edges.
-                    crop_W = W / cam_crop_info[cam_modality][f"crop_ratio_W_{cam_modality}"] - 4 # There may be unstable response values at the edges.
+                    crop_H = H / cam_crop_info[cam_modality][
+                        f"crop_ratio_H_{cam_modality}"] - 4  # There may be unstable response values at the edges.
+                    crop_W = W / cam_crop_info[cam_modality][
+                        f"crop_ratio_W_{cam_modality}"] - 4  # There may be unstable response values at the edges.
 
-                    start_h = int(H//2-crop_H//2)
-                    end_h = int(H//2+crop_H//2)
-                    start_w = int(W//2-crop_W//2)
-                    end_w = int(W//2+crop_W//2)
+                    start_h = int(H // 2 - crop_H // 2)
+                    end_h = int(H // 2 + crop_H // 2)
+                    start_w = int(W // 2 - crop_W // 2)
+                    end_w = int(W // 2 + crop_W // 2)
 
-                    cam_crop_mask[cam_agent_mask_dict[cam_modality],:,start_h:end_h, start_w:end_w] = 0
-                    cam_crop_mask[cam_agent_mask_dict[cam_modality]] = 1 - cam_crop_mask[cam_agent_mask_dict[cam_modality]]
+                    cam_crop_mask[cam_agent_mask_dict[cam_modality], :, start_h:end_h, start_w:end_w] = 0
+                    cam_crop_mask[cam_agent_mask_dict[cam_modality]] = 1 - cam_crop_mask[
+                        cam_agent_mask_dict[cam_modality]]
 
                 score = score * cam_crop_mask
 
-            fused_feature_list.append(weighted_fuse(feature_list[i], score, record_len, affine_matrix, self.align_corners))
+            fused_feature_list.append(
+                weighted_fuse(feature_list[i], score, record_len, affine_matrix, self.align_corners))
         fused_feature = self.decode_multiscale_feature(fused_feature_list)
 
-        
-        return fused_feature, occ_map_list 
+        return fused_feature, occ_map_list

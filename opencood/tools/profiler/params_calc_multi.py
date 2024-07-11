@@ -1,20 +1,17 @@
+import argparse
+import importlib
+import pickle
+import sys
+import time
+
+import torch
 from fvcore.nn import FlopCountAnalysis
 from fvcore.nn import flop_count_table
+
 import opencood.hypes_yaml.yaml_utils as yaml_utils
 from opencood.tools import train_utils
-import argparse
-import pickle
-from opencood.utils.common_utils import update_dict
-import importlib
-import time
-import sys
-import torch
-import os
-import subprocess
-import numpy as np
 from opencood.tools.profiler.params_calc import inference_throughput_naive, inference_throughput_cuda_event
-from torch.profiler import profile, record_function, ProfilerActivity
-import time
+from opencood.utils.common_utils import update_dict
 
 
 def train_parser():

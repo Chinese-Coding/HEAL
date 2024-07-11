@@ -2,18 +2,14 @@
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
-import random
+import copy
 import math
 from collections import OrderedDict
+
 import numpy as np
 import torch
-import copy
-from icecream import ic
-from PIL import Image
-import pickle as pkl
+
 from opencood.utils import box_utils as box_utils
-from opencood.data_utils.pre_processor import build_preprocessor
-from opencood.data_utils.post_processor import build_postprocessor
 from opencood.utils.camera_utils import (
     sample_augmentation,
     img_transform,
@@ -21,15 +17,15 @@ from opencood.utils.camera_utils import (
     img_to_tensor,
 )
 from opencood.utils.common_utils import merge_features_to_dict
-from opencood.utils.transformation_utils import x1_to_x2, x_to_world, get_pairwise_transformation
-from opencood.utils.pose_utils import add_noise_data_dict
+from opencood.utils.common_utils import read_json
 from opencood.utils.pcd_utils import (
     mask_points_by_range,
     mask_ego_points,
     shuffle_points,
     downsample_lidar_minimum,
 )
-from opencood.utils.common_utils import read_json
+from opencood.utils.pose_utils import add_noise_data_dict
+from opencood.utils.transformation_utils import x1_to_x2, get_pairwise_transformation
 
 
 def getIntermediateFusionDataset(cls):

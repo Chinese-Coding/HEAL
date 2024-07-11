@@ -14,6 +14,7 @@ from opencood.utils import box_utils
 from opencood.utils import common_utils
 from opencood.utils.transformation_utils import x1_to_x2
 
+
 class BasePostprocessor(object):
     """
     Template for Anchor generator.
@@ -100,12 +101,11 @@ class BasePostprocessor(object):
         # filter the gt_box to make sure all bbx are in the range. with z dim
         gt_box3d_np = gt_box3d_tensor.cpu().numpy()
         gt_box3d_np = box_utils.mask_boxes_outside_range_numpy(gt_box3d_np,
-                                                    self.params['gt_range'],
-                                                    order=None)
+                                                               self.params['gt_range'],
+                                                               order=None)
         gt_box3d_tensor = torch.from_numpy(gt_box3d_np).to(device=gt_box3d_list.device)
 
         return gt_box3d_tensor
-
 
     def generate_gt_bbx_by_iou(self, data_dict):
         """
@@ -165,8 +165,7 @@ class BasePostprocessor(object):
             inf_corners_np = gt_box3d_list[1].cpu().numpy()
             inf_polygon_list = list(common_utils.convert_format(inf_corners_np))
             veh_polygon_list = list(common_utils.convert_format(veh_corners_np))
-            iou_thresh = 0.05 
-
+            iou_thresh = 0.05
 
             gt_from_inf = []
             for i in range(len(inf_polygon_list)):
@@ -175,7 +174,7 @@ class BasePostprocessor(object):
                 if (ious > iou_thresh).any():
                     continue
                 gt_from_inf.append(inf_corners_np[i])
-            
+
             if len(gt_from_inf):
                 gt_from_inf = np.stack(gt_from_inf)
                 gt_box3d = np.vstack([veh_corners_np, gt_from_inf])
@@ -195,7 +194,6 @@ class BasePostprocessor(object):
         mask = \
             box_utils.get_mask_for_boxes_within_range_torch(gt_box3d_tensor, self.params['gt_range'])
         gt_box3d_tensor = gt_box3d_tensor[mask, :, :]
-
 
         return gt_box3d_tensor
 
@@ -253,10 +251,9 @@ class BasePostprocessor(object):
             object_ids.append(object_id)
         return object_np, mask, object_ids
 
-
     def generate_object_center_v2x(self,
-                               cav_contents,
-                               reference_lidar_pose):
+                                   cav_contents,
+                                   reference_lidar_pose):
         """
         Retrieve all objects in a format of (n, 7), where 7 represents
         x, y, z, l, w, h, yaw or x, y, z, h, w, l, yaw.
@@ -282,7 +279,7 @@ class BasePostprocessor(object):
         # from opencood.data_utils.datasets import GT_RANGE
 
         assert len(cav_contents) == 1
-        
+
         """
         In old version, we only let ego agent return gt box.
         Other agent return empty.
@@ -293,27 +290,25 @@ class BasePostprocessor(object):
         Thankfully, 'lidar_np' is in cav_contents[0].keys()
         """
 
-
-        gt_boxes = cav_contents[0]['params']['vehicles'] # notice [N,10], 10 includes [x,y,z,dx,dy,dz,w,a,b,c]
+        gt_boxes = cav_contents[0]['params']['vehicles']  # notice [N,10], 10 includes [x,y,z,dx,dy,dz,w,a,b,c]
         object_ids = cav_contents[0]['params']['object_ids']
         lidar_np = cav_contents[0]['lidar_np']
-        
-        tmp_object_dict = {"gt_boxes": gt_boxes, "object_ids":object_ids}
+
+        tmp_object_dict = {"gt_boxes": gt_boxes, "object_ids": object_ids}
 
         output_dict = {}
-        filter_range = self.params['anchor_args']['cav_lidar_range'] # v2x we don't use GT_RANGE.
+        filter_range = self.params['anchor_args']['cav_lidar_range']  # v2x we don't use GT_RANGE.
 
         box_utils.project_world_objects_v2x(tmp_object_dict,
-                                        output_dict,
-                                        reference_lidar_pose,
-                                        filter_range,
-                                        self.params['order'],
-                                        lidar_np=lidar_np)
+                                            output_dict,
+                                            reference_lidar_pose,
+                                            filter_range,
+                                            self.params['order'],
+                                            lidar_np=lidar_np)
 
         object_np = np.zeros((self.params['max_num'], 7))
         mask = np.zeros(self.params['max_num'])
         object_ids = []
-
 
         for i, (object_id, object_bbx) in enumerate(output_dict.items()):
             object_np[i] = object_bbx[0, :]
@@ -323,8 +318,8 @@ class BasePostprocessor(object):
         return object_np, mask, object_ids
 
     def generate_object_center_dairv2x(self,
-                               cav_contents,
-                               reference_lidar_pose):
+                                       cav_contents,
+                                       reference_lidar_pose):
         """
         Retrieve all objects in a format of (n, 7), where 7 represents
         x, y, z, l, w, h, yaw or x, y, z, h, w, l, yaw.
@@ -350,17 +345,16 @@ class BasePostprocessor(object):
         # tmp_object_dict = {}
         tmp_object_list = []
         cav_content = cav_contents[0]
-        tmp_object_list = cav_content['params']['vehicles'] #世界坐标系下
+        tmp_object_list = cav_content['params']['vehicles']  # 世界坐标系下
 
         output_dict = {}
         filter_range = self.params['anchor_args']['cav_lidar_range']
-
 
         box_utils.project_world_objects_dairv2x(tmp_object_list,
-                                        output_dict,
-                                        reference_lidar_pose,
-                                        filter_range,
-                                        self.params['order'])
+                                                output_dict,
+                                                reference_lidar_pose,
+                                                filter_range,
+                                                self.params['order'])
 
         object_np = np.zeros((self.params['max_num'], 7))
         mask = np.zeros(self.params['max_num'])
@@ -372,11 +366,10 @@ class BasePostprocessor(object):
             object_ids.append(object_id)
 
         return object_np, mask, object_ids
-
 
     def generate_object_center_dairv2x_single(self,
-                               cav_contents,
-                               suffix=""):
+                                              cav_contents,
+                                              suffix=""):
         """
         Retrieve all objects in a format of (n, 7), where 7 represents
         x, y, z, l, w, h, yaw or x, y, z, h, w, l, yaw.
@@ -399,16 +392,15 @@ class BasePostprocessor(object):
         # tmp_object_dict = {}
         tmp_object_list = []
         cav_content = cav_contents[0]
-        tmp_object_list = cav_content['params'][f'vehicles{suffix}'] # ego 坐标系下
+        tmp_object_list = cav_content['params'][f'vehicles{suffix}']  # ego 坐标系下
 
         output_dict = {}
         filter_range = self.params['anchor_args']['cav_lidar_range']
-
 
         box_utils.load_single_objects_dairv2x(tmp_object_list,
-                                        output_dict,
-                                        filter_range,
-                                        self.params['order'])
+                                              output_dict,
+                                              filter_range,
+                                              self.params['order'])
 
         object_np = np.zeros((self.params['max_num'], 7))
         mask = np.zeros(self.params['max_num'])
@@ -421,13 +413,11 @@ class BasePostprocessor(object):
 
         return object_np, mask, object_ids
 
-
-
     def generate_object_center_dairv2x_single_hetero(self,
-                               cav_contents,
-                               reference_lidar_pose,
-                               suffix,
-                               ):
+                                                     cav_contents,
+                                                     reference_lidar_pose,
+                                                     suffix,
+                                                     ):
         """
         Retrieve all objects in a format of (n, 7), where 7 represents
         x, y, z, l, w, h, yaw or x, y, z, h, w, l, yaw.
@@ -450,20 +440,20 @@ class BasePostprocessor(object):
         # tmp_object_dict = {}
         tmp_object_list = []
         cav_content = cav_contents[0]
-        tmp_object_list = cav_content['params'][f'vehicles{suffix}'] # ego 坐标系下
+        tmp_object_list = cav_content['params'][f'vehicles{suffix}']  # ego 坐标系下
 
         output_dict = {}
         filter_range = self.params['anchor_args']['cav_lidar_range']
 
-        cav_coor = cav_content['params']['lidar_pose'] # T_world_cav
-        ego_coor = reference_lidar_pose # T_world_ego
-        T_ego_cav = x1_to_x2(cav_coor, ego_coor) # T_ego_cav
+        cav_coor = cav_content['params']['lidar_pose']  # T_world_cav
+        ego_coor = reference_lidar_pose  # T_world_ego
+        T_ego_cav = x1_to_x2(cav_coor, ego_coor)  # T_ego_cav
 
         box_utils.load_single_objects_dairv2x_hetero(tmp_object_list,
-                                        output_dict,
-                                        filter_range,
-                                        T_ego_cav,
-                                        self.params['order'])
+                                                     output_dict,
+                                                     filter_range,
+                                                     T_ego_cav,
+                                                     self.params['order'])
 
         object_np = np.zeros((self.params['max_num'], 7))
         mask = np.zeros(self.params['max_num'])
@@ -476,14 +466,7 @@ class BasePostprocessor(object):
 
         return object_np, mask, object_ids
 
-
-
-
-
-    def generate_visible_object_center(self,
-                               cav_contents,
-                               reference_lidar_pose,
-                               enlarge_z=False):
+    def generate_visible_object_center(self, cav_contents, reference_lidar_pose, enlarge_z=False):
         """
         Retrieve all objects in a format of (n, 7), where 7 represents
         x, y, z, l, w, h, yaw or x, y, z, h, w, l, yaw.
@@ -518,24 +501,24 @@ class BasePostprocessor(object):
             tmp_object_dict.update(cav_content['params']['vehicles'])
 
         output_dict = {}
-        filter_range = self.params['anchor_args']['cav_lidar_range'] # if self.train else GT_RANGE_OPV2V
+        filter_range = self.params['anchor_args']['cav_lidar_range']  # if self.train else GT_RANGE_OPV2V
         inf_filter_range = [-1e5, -1e5, -1e5, 1e5, 1e5, 1e5]
         visibility_map = np.asarray(cv2.cvtColor(cav_contents[0]["bev_visibility.png"], cv2.COLOR_BGR2GRAY))
         ego_lidar_pose = cav_contents[0]["params"]["lidar_pose_clean"]
 
         # 1-time filter: in ego coordinate, use visibility map to filter.
         box_utils.project_world_visible_objects(tmp_object_dict,
-                                        output_dict,
-                                        ego_lidar_pose,
-                                        inf_filter_range,
-                                        self.params['order'],
-                                        visibility_map,
-                                        enlarge_z)
+                                                output_dict,
+                                                ego_lidar_pose,
+                                                inf_filter_range,
+                                                self.params['order'],
+                                                visibility_map,
+                                                enlarge_z)
 
         updated_tmp_object_dict = {}
         for k, v in tmp_object_dict.items():
             if k in output_dict:
-                updated_tmp_object_dict[k] = v # not visible
+                updated_tmp_object_dict[k] = v  # not visible
         output_dict = {}
 
         # 2-time filter: use reference_lidar_pose
@@ -558,9 +541,9 @@ class BasePostprocessor(object):
         return object_np, mask, object_ids
 
     def generate_object_center_v2xset_camera(self,
-                               cav_contents,
-                               reference_lidar_pose,
-                               enlarge_z=False):
+                                             cav_contents,
+                                             reference_lidar_pose,
+                                             enlarge_z=False):
 
         tmp_object_dict = {}
         for cav_content in cav_contents:

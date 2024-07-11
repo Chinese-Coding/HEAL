@@ -4,21 +4,16 @@ Training throughput calculation
 
 
 import argparse
-import os
-import statistics
+import importlib
+import time
 
 import torch
-from torch.utils.data import DataLoader, Subset
-from tensorboardX import SummaryWriter
+from torch.utils.data import DataLoader
 
 import opencood.hypes_yaml.yaml_utils as yaml_utils
-from opencood.tools import train_utils
 from opencood.data_utils.datasets import build_dataset
+from opencood.tools import train_utils
 from opencood.utils.common_utils import update_dict
-import importlib
-from icecream import ic
-
-import time
 
 
 def test_performance(model, train_dataloader, criterion=None, optimizer=None, supervise_single_flag=False):

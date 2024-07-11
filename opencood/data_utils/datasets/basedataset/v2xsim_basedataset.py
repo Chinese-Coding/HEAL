@@ -1,19 +1,18 @@
 # Author: Yangheng Zhao <zhaoyangheng-sjtu@sjtu.edu.cn>
 
-import os
 import pickle
+from abc import abstractmethod
 from collections import OrderedDict
 from typing import Dict
-from abc import abstractmethod
+
 import numpy as np
-import torch
 from torch.utils.data import Dataset
 
 from opencood.data_utils.augmentor.data_augmentor import DataAugmentor
-from opencood.utils.common_utils import read_json
-from opencood.utils.transformation_utils import tfm_to_pose
-from opencood.data_utils.pre_processor import build_preprocessor
 from opencood.data_utils.post_processor import build_postprocessor
+from opencood.data_utils.pre_processor import build_preprocessor
+from opencood.utils.transformation_utils import tfm_to_pose
+
 
 class V2XSIMBaseDataset(Dataset):
     """
@@ -22,10 +21,7 @@ class V2XSIMBaseDataset(Dataset):
         Only support LiDAR data. (even in hetero)
     """
 
-    def __init__(self,
-                 params: Dict,
-                 visualize: bool = False,
-                 train: bool = True):
+    def __init__(self,params: Dict,visualize: bool = False,train: bool = True):
         self.params = params
         self.visualize = visualize
         self.train = train
@@ -45,8 +41,7 @@ class V2XSIMBaseDataset(Dataset):
 
         print("Dataset dir:", root_dir)
 
-        if 'train_params' not in params or \
-                'max_cav' not in params['train_params']:
+        if 'train_params' not in params or 'max_cav' not in params['train_params']:
             self.max_cav = 5
         else:
             self.max_cav = params['train_params']['max_cav']
@@ -62,9 +57,7 @@ class V2XSIMBaseDataset(Dataset):
                                             else self.generate_object_center_camera
         self.generate_object_center_single = self.generate_object_center
 
-        self.add_data_extension = \
-            params['add_data_extension'] if 'add_data_extension' \
-                                            in params else []
+        self.add_data_extension = params['add_data_extension'] if 'add_data_extension' in params else []
 
         if "noise_setting" not in self.params:
             self.params['noise_setting'] = OrderedDict()

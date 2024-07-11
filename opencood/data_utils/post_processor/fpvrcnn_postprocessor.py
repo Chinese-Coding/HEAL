@@ -9,7 +9,7 @@ from opencood.data_utils.post_processor.voxel_postprocessor \
 from opencood.utils import box_utils
 from opencood.utils import common_utils
 from opencood.utils.common_utils import limit_period
-from icecream import ic
+
 
 class FpvrcnnPostprocessor(VoxelPostprocessor):
     def __init__(self, anchor_params, train):

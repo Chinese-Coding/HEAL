@@ -6,22 +6,21 @@
 # Support multiple fusion strategies.
 
 
+import importlib
+from collections import OrderedDict, Counter
+
 import torch
 import torch.nn as nn
-import numpy as np
-from icecream import ic
-from collections import OrderedDict, Counter
-from opencood.models.sub_modules.point_pillar_scatter import PointPillarScatter
-from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone 
-from opencood.models.sub_modules.feature_alignnet import AlignNet
+import torchvision
+
+from opencood.models.fuse_modules.fusion_in_one import MaxFusion, AttFusion, DiscoFusion, V2VNetFusion, V2XViTFusion, \
+    CoBEVT, Where2commFusion, Who2comFusion
 from opencood.models.sub_modules.base_bev_backbone import BaseBEVBackbone
 from opencood.models.sub_modules.downsample_conv import DownsampleConv
 from opencood.models.sub_modules.naive_compress import NaiveCompressor
-from opencood.models.fuse_modules.fusion_in_one import MaxFusion, AttFusion, DiscoFusion, V2VNetFusion, V2XViTFusion, CoBEVT, Where2commFusion, Who2comFusion
+from opencood.utils.model_utils import check_trainable_module
 from opencood.utils.transformation_utils import normalize_pairwise_tfm
-from opencood.utils.model_utils import check_trainable_module, fix_bn, unfix_bn
-import importlib
-import torchvision
+
 
 class HeterModelBaseline(nn.Module):
     def __init__(self, args):

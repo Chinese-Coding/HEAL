@@ -2,13 +2,13 @@
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
 
-from PIL import Image
+import math
+
 import numpy as np
 import torch
 import torchvision
-import cv2
-import math
-from shapely.geometry import Point, MultiPoint
+from PIL import Image
+
 
 def load_camera_data(camera_files, preload=True):
     """

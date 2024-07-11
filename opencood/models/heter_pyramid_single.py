@@ -3,30 +3,39 @@
 HEAL: An Extensible Framework for Open Heterogeneous Collaborative Perception 
 """
 
-import torch
+from collections import OrderedDict
+
 import torch.nn as nn
-import numpy as np
-from icecream import ic
 import torchvision
-from collections import OrderedDict, Counter
-from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone 
+
+from opencood.logger import get_logger
 from opencood.models.fuse_modules.pyramid_fuse import PyramidFusion
-from opencood.models.sub_modules.feature_alignnet import AlignNet
+from opencood.models.heter_encoders import LiftSplatShoot
+from opencood.models.heter_encoders import PointPillar
+from opencood.models.heter_encoders import SECOND
+from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
 from opencood.models.sub_modules.downsample_conv import DownsampleConv
-import importlib
-from opencood.utils.model_utils import check_trainable_module, fix_bn, unfix_bn
+from opencood.models.sub_modules.feature_alignnet import AlignNet
+from opencood.utils.model_utils import check_trainable_module, fix_bn
+
+encoders = {
+    'second': SECOND,
+    'lift_splat_shoot': LiftSplatShoot,
+    'point_pillar': PointPillar
+}
+
+logger = get_logger()
 
 class HeterPyramidSingle(nn.Module):
     def __init__(self, args):
-        super(HeterPyramidSingle, self).__init__()
+        super().__init__()
         modality_name_list = list(args.keys())
-        modality_name_list = [x for x in modality_name_list if x.startswith("m") and x[1:].isdigit()] 
+        modality_name_list = [x for x in modality_name_list if x.startswith("m") and x[1:].isdigit()]
         self.modality_name_list = modality_name_list
         self.cav_range = args['lidar_range']
         self.sensor_type_dict = OrderedDict()
         self.fix_modules = ['pyramid_backbone', 'cls_head', 'reg_head', 'dir_head']
-        
-        
+
         # setup each modality model
         for modality_name in self.modality_name_list:
             model_setting = args[modality_name]
@@ -34,19 +43,28 @@ class HeterPyramidSingle(nn.Module):
             self.sensor_type_dict[modality_name] = sensor_name
 
             # import model
-            encoder_filename = "opencood.models.heter_encoders"
-            encoder_lib = importlib.import_module(encoder_filename)
-            encoder_class = None
-            target_model_name = model_setting['core_method'].replace('_', '')
+            # encoder_filename = "opencood.models.heter_encoders"
+            # encoder_lib = importlib.import_module(encoder_filename)
+            # encoder_class = None
+            # target_model_name = model_setting['core_method'].replace('_', '')
+            #
+            # for name, cls in encoder_lib.__dict__.items():
+            #     if name.lower() == target_model_name.lower():
+            #         encoder_class = cls
 
-            for name, cls in encoder_lib.__dict__.items():
-                if name.lower() == target_model_name.lower():
-                    encoder_class = cls
+            # TODO: 这样利用字典从 `opencood.models.heter_encoders` 中引入, 看起来有些死板, 但是 IDE 的代码提示变好了啊
+            #        也许将 `encoder` 再单独从这个文件里面提取出来比较好. 配置文件中 `encoder` 的命名方式最好和代码中的一样
+            try:
+                encoder_class = encoders[model_setting['core_method']]
+            except KeyError:
+                available_encoders = ', '.join(encoders.keys())
+                logger.error(f'不受支持的 encoder. 新选择的 encoder: {model_setting["core_method"]}. 可用的 encoders: {available_encoders}')
+                exit(-1)
 
             # build encoder
             setattr(self, f"encoder_{modality_name}", encoder_class(model_setting['encoder_args']))
             # depth supervision for camera
-            if model_setting['encoder_args'].get("depth_supervision", False) :
+            if model_setting['encoder_args'].get("depth_supervision", False):
                 setattr(self, f"depth_supervision_{modality_name}", True)
             else:
                 setattr(self, f"depth_supervision_{modality_name}", False)
@@ -55,8 +73,10 @@ class HeterPyramidSingle(nn.Module):
             setattr(self, f"backbone_{modality_name}", ResNetBEVBackbone(model_setting['backbone_args']))
             if sensor_name == "camera":
                 camera_mask_args = model_setting['camera_mask_args']
-                setattr(self, f"crop_ratio_W_{modality_name}", (self.cav_range[3]) / (camera_mask_args['grid_conf']['xbound'][1]))
-                setattr(self, f"crop_ratio_H_{modality_name}", (self.cav_range[4]) / (camera_mask_args['grid_conf']['ybound'][1]))
+                setattr(self, f"crop_ratio_W_{modality_name}",
+                        (self.cav_range[3]) / (camera_mask_args['grid_conf']['xbound'][1]))
+                setattr(self, f"crop_ratio_H_{modality_name}",
+                        (self.cav_range[4]) / (camera_mask_args['grid_conf']['ybound'][1]))
 
             setattr(self, f"aligner_{modality_name}", AlignNet(model_setting['aligner_args']))
 
@@ -79,14 +99,12 @@ class HeterPyramidSingle(nn.Module):
         """
         Shared Heads, Would load from pretrain base.
         """
-        self.cls_head = nn.Conv2d(args['in_head'], args['anchor_number'],
-                                  kernel_size=1)
-        self.reg_head = nn.Conv2d(args['in_head'], 7 * args['anchor_number'],
-                                  kernel_size=1)
-        self.dir_head = nn.Conv2d(args['in_head'], args['dir_args']['num_bins'] * args['anchor_number'],
-                                  kernel_size=1) # BIN_NUM = 2
-        
-        self.model_train_init()
+        self.cls_head = nn.Conv2d(args['in_head'], args['anchor_number'], kernel_size=1)
+        self.reg_head = nn.Conv2d(args['in_head'], 7 * args['anchor_number'], kernel_size=1)
+        # BIN_NUM = 2
+        self.dir_head = nn.Conv2d(args['in_head'], args['dir_args']['num_bins'] * args['anchor_number'], kernel_size=1)
+
+        # self.model_train_init() # TODO: 在主函数中已经调用, 这里有必要再调用一次吗?
         # check again which module is not fixed.
         check_trainable_module(self)
 
@@ -110,14 +128,15 @@ class HeterPyramidSingle(nn.Module):
             # should be padding. Instead of masking
             _, _, H, W = feature.shape
             feature = torchvision.transforms.CenterCrop(
-                    (int(H*eval(f"self.crop_ratio_H_{modality_name}")), int(W*eval(f"self.crop_ratio_W_{modality_name}")))
-                )(feature)
+                (int(H * eval(f"self.crop_ratio_H_{modality_name}")),
+                 int(W * eval(f"self.crop_ratio_W_{modality_name}")))
+            )(feature)
 
             if eval(f"self.depth_supervision_{modality_name}"):
                 output_dict.update({
                     f"depth_items_{modality_name}": eval(f"self.encoder_{modality_name}").depth_items
                 })
-        
+
         # multiscale fusion. 
         feature, occ_map_list = self.pyramid_backbone.forward_single(feature)
 
@@ -131,6 +150,6 @@ class HeterPyramidSingle(nn.Module):
         output_dict.update({'cls_preds': cls_preds,
                             'reg_preds': reg_preds,
                             'dir_preds': dir_preds})
-        output_dict.update({'occ_single_list': 
-                            occ_map_list})
+        output_dict.update({'occ_single_list':
+                                occ_map_list})
         return output_dict

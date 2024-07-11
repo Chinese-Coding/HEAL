@@ -1,19 +1,16 @@
-import random, os
-
-import torch
-from torch import nn
 import numpy as np
+from torch import nn
 
-from opencood.models.sub_modules.mean_vfe import MeanVFE
-from opencood.models.sub_modules.sparse_backbone_3d import VoxelBackBone8x
-from opencood.models.sub_modules.height_compression import HeightCompression
-from opencood.models.sub_modules.cia_ssd_utils import SSFA, Head
-from opencood.models.sub_modules.vsa import VoxelSetAbstraction
-from opencood.models.sub_modules.roi_head import RoIHead
-from opencood.models.sub_modules.matcher import Matcher
 from opencood.data_utils.post_processor.fpvrcnn_postprocessor import \
     FpvrcnnPostprocessor
-from opencood.models.sub_modules.torch_transformation_utils import warp_affine_simple
+from opencood.models.sub_modules.cia_ssd_utils import SSFA, Head
+from opencood.models.sub_modules.height_compression import HeightCompression
+from opencood.models.sub_modules.matcher import Matcher
+from opencood.models.sub_modules.mean_vfe import MeanVFE
+from opencood.models.sub_modules.roi_head import RoIHead
+from opencood.models.sub_modules.sparse_backbone_3d import VoxelBackBone8x
+from opencood.models.sub_modules.vsa import VoxelSetAbstraction
+
 
 class FPVRCNN(nn.Module):
     def __init__(self, args):

@@ -1,8 +1,9 @@
+import numpy as np
 import torch
 from torch import nn
-import numpy as np
+
 from opencood.loss.ciassd_loss import CiassdLoss, weighted_smooth_l1_loss
-from icecream import ic 
+
 
 class FpvrcnnLoss(nn.Module):
     def __init__(self, args):
@@ -122,7 +123,8 @@ class FpvrcnnLoss(nn.Module):
                         self.loss_dict['reg_loss'].item(),
                         self.loss_dict['iou_loss'].item(),
                     )
-            print(str_to_print)
+            # print(str_to_print)
+            logger.info(str_to_print)
             
         if writer:
             writer.add_scalar('Ciassd_regression_loss', reg_loss.item(),
