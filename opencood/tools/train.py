@@ -144,11 +144,12 @@ def main():
             optimizer.step()
 
             # torch.cuda.empty_cache()  # it will destroy memory buffer
-        logger.success('开始计算损失')
         if epoch % hypes['train_params']['save_freq'] == 0:
+            logger.success(f'保存中继点： {epoch}')
             torch.save(model.state_dict(), os.path.join(saved_path, 'net_epoch%d.pth' % (epoch + 1)))
 
         if epoch % hypes['train_params']['eval_freq'] == 0:
+            logger.success('开始计算损失')
             valid_ave_loss = []
 
             with torch.no_grad():
