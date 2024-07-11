@@ -20,6 +20,7 @@ pyquaternion~=0.9.9
 efficientnet_pytorch==0.7.0
 scikit_learn
 python-lzf
+termcolor
 opencood~=0.1.0
 scikit-learn~=1.3.2
 matplotlib~=3.7.5

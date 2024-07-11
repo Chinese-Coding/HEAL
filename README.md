@@ -97,7 +97,7 @@ HEAL/dataset
 conda create -n heal python=3.8
 conda activate heal
 # install pytorch. Cudatoolkit 11.3 are tested in our experiment.
-conda install pytorch==1.10.1 torchvision==0.11.2 torchaudio==0.10.1 cudatoolkit=11.3 -c pytorch -c conda-forge
+conda create -n coalign python=3.8 pytorch==1.12.0 torchvision==0.13.0 torchaudio==0.12.0 cudatoolkit=11.6 -c pytorch -c conda-forge
 # install dependency
 pip install -r requirements.txt
 # install this project. It's OK if EasyInstallDeprecationWarning shows up.
@@ -105,19 +105,16 @@ python setup.py develop
 ```
 
 
-### Step 2: Install Spconv (1.2.1 or ~~2.x~~)
-We use spconv 1.2.1 to generate voxel features. 
+### Step 2: Install Spconv (1.2.1 or 2.x)
+We use spconv 1.2.1 or spconv 2.x to generate voxel features. 
 
-To install spconv 1.2.1, please follow the guide in https://github.com/traveller59/spconv/tree/v1.2.1.
+To install **spconv 1.2.1**, please follow the guide in https://github.com/traveller59/spconv/tree/v1.2.1.
+You can also get a detailed installation guide in [CoAlign Installation Doc](https://udtkdfu8mk.feishu.cn/docx/LlMpdu3pNoCS94xxhjMcOWIynie#doxcn5rISC6NcfXIUnWFnXhTEzd).
 
-#### Spconv 2.x
+To install **spconv 2.x**, check the [table](https://github.com/traveller59/spconv#spconv-spatially-sparse-convolution-library) to run the installation command. For example we have cudatoolkit 11.6, then we should run
 ```bash
-pip install spconv-cu113
+pip install spconv-cu116 # match your cudatoolkit version
 ```
-
-#### Tips for installing spconv 1.2.1:
-1. make sure your cmake version >= 3.13.2
-2. CUDNN and CUDA runtime library (use `nvcc --version` to check) needs to be installed on your machine.
 
 ### Step 3: Bbx IoU cuda version compile
 Install bbx nms calculation cuda version
@@ -278,6 +275,10 @@ Take the DAIR-V2X dataset as an example, which consists of one vehicle and one R
 
 ## Benchmark Checkpoints
 We store our checkpoints files in [HEAL's Huggingface Hub](https://huggingface.co/yifanlu/HEAL/tree/main).
+
+Update: Those checkpoints has a faulty input channel number for SECOND related models, but you can still run them with spconv 1.2.1 (because spconv 1.2.1 has no sanity check). The performance should degrade but it still looks reasonable. More discussion can be found in [Issue 20](https://github.com/yifanlu0227/HEAL/issues/20). 
+
+If you want to compare with HEAL's model and you use spconv 1.2.1, you can still load from the checkpoint. To develop your model, please do not use these checkpoints.
 
 ## Citation
 ```
