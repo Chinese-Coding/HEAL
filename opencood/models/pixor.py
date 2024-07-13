@@ -12,8 +12,7 @@ import torch.nn.functional as F
 
 def conv3x3(in_planes, out_planes, stride=1, bias=False):
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=bias)
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=bias)
 
 
 class BasicBlock(nn.Module):
@@ -51,8 +50,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, in_planes, planes, stride=1, downsample=None,
-                 use_bn=True):
+    def __init__(self, in_planes, planes, stride=1, downsample=None, use_bn=True):
         super(Bottleneck, self).__init__()
         bias = not use_bn
         self.use_bn = use_bn

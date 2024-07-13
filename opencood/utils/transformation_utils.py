@@ -8,6 +8,7 @@ Transformation utils
 
 import numpy as np
 import torch
+from torch import Tensor
 
 from opencood.utils.common_utils import check_numpy_to_torch
 
@@ -66,7 +67,7 @@ def get_pairwise_transformation(base_data_dict, max_cav, proj_first):
     return pairwise_t_matrix
 
 
-def normalize_pairwise_tfm(pairwise_t_matrix, H, W, discrete_ratio, downsample_rate=1):
+def normalize_pairwise_tfm(pairwise_t_matrix: Tensor, H: int, W: int, discrete_ratio: int, downsample_rate=1) -> Tensor:
     """
     normalize the pairwise transformation matrix to affine matrix need by torch.nn.functional.affine_grid()
     Args:

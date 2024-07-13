@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
+from typing import Mapping
 
 import torch
 import torch.nn.functional as F
@@ -11,8 +12,9 @@ from opencood.loss.point_pillar_loss import sigmoid_focal_loss
 
 logger = get_logger()
 
+
 class PointPillarPyramidLoss(PointPillarDepthLoss):
-    def __init__(self, args):
+    def __init__(self, args: Mapping):
         super().__init__(args)
         self.pyramid = args['pyramid']
 
@@ -144,3 +146,9 @@ class PointPillarPyramidLoss(PointPillarDepthLoss):
             writer.add_scalar('Iou_loss' + suffix, iou_loss, epoch * batch_len + batch_id)
             writer.add_scalar('Depth_loss' + suffix, depth_loss, epoch * batch_len + batch_id)
             writer.add_scalar('Pyramid_loss' + suffix, pyramid_loss, epoch * batch_len + batch_id)
+
+        return {
+            'Loss': total_loss, 'Conf Loss': cls_loss, 'Loc Loss': reg_loss,
+            'Dir Loss': dir_loss, 'IoU Loss': iou_loss, 'Depth Loss': depth_loss,
+            'Pyramid Loss': pyramid_loss
+        }

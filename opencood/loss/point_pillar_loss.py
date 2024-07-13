@@ -2,10 +2,13 @@
 # Author: Yifan Lu
 # Add direction classification loss
 # The originally point_pillar_loss.py, can not determine if the box heading is opposite to the GT.
+from typing import Union, Dict, Mapping
 
 import numpy as np
 import torch
 import torch.nn as nn
+from tensorboardX import SummaryWriter
+
 from opencood.logger import get_logger
 
 from opencood.data_utils.post_processor.voxel_postprocessor import VoxelPostprocessor
@@ -13,8 +16,9 @@ from opencood.utils.common_utils import limit_period
 
 logger = get_logger()
 
+
 class PointPillarLoss(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args: Mapping):
         super(PointPillarLoss, self).__init__()
         self.pos_cls_weight = args['pos_cls_weight']
 
@@ -163,20 +167,16 @@ class PointPillarLoss(nn.Module):
         dir_cls_targets = one_hot_f(dir_cls_targets, num_bins)
         return dir_cls_targets
 
-    def logging(self, epoch, batch_id, batch_len, writer=None, suffix=""):
+    def logging(self, epoch: int, batch_id: int, batch_len: int,
+                writer: Union[SummaryWriter, None] = None, suffix="") -> Dict[str, float]:
         """
-        Print out  the loss function for current iteration.
-
-        Parameters
-        ----------
-        epoch : int
-            Current epoch for training.
-        batch_id : int
-            The current batch.
-        batch_len : int
-            Total batch length in one iteration of training,
-        writer : SummaryWriter
-            Used to visualize on tensorboard
+        Print out the loss function for current iteration.
+        :param epoch: Current epoch for training.
+        :param batch_id: The current batch.
+        :param batch_len: Total batch length in one iteration of training,
+        :param writer: Used to visualize on tensorboard
+        :param suffix:
+        :return: 需要显示的 loss
         """
         total_loss = self.loss_dict.get('total_loss', 0)
         reg_loss = self.loss_dict.get('reg_loss', 0)
@@ -198,6 +198,14 @@ class PointPillarLoss(nn.Module):
             writer.add_scalar('Confidence_loss' + suffix, cls_loss, epoch * batch_len + batch_id)
             writer.add_scalar('Dir_loss' + suffix, dir_loss, epoch * batch_len + batch_id)
             writer.add_scalar('Iou_loss' + suffix, iou_loss, epoch * batch_len + batch_id)
+
+        return {
+            'Loss': total_loss,
+            'Conf Loss': cls_loss,
+            'Loc Loss': reg_loss,
+            'Dir Loss': dir_loss,
+            'IoU Loss': iou_loss
+        }
 
 
 def one_hot_f(tensor, num_bins, dim=-1, on_value=1.0, dtype=torch.float32):

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
+from typing import Mapping
 
 import torch
 import torch.nn as nn
@@ -45,17 +46,13 @@ def weighted_fuse(x, score, record_len, affine_matrix, align_corners):
         score = split_score[b]
         t_matrix = affine_matrix[b][:N, :N, :, :]
         i = 0  # ego
-        feature_in_ego = warp_affine_simple(batch_node_features[b],
-                                            t_matrix[i, :, :, :],
-                                            (H, W), align_corners=align_corners)
-        scores_in_ego = warp_affine_simple(split_score[b],
-                                           t_matrix[i, :, :, :],
-                                           (H, W), align_corners=align_corners)
+        feature_in_ego = warp_affine_simple(batch_node_features[b], t_matrix[i, :, :, :], (H, W),
+                                            align_corners=align_corners)
+        scores_in_ego = warp_affine_simple(split_score[b], t_matrix[i, :, :, :], (H, W), align_corners=align_corners)
         scores_in_ego.masked_fill_(scores_in_ego == 0, -float('inf'))
         scores_in_ego = torch.softmax(scores_in_ego, dim=0)
         scores_in_ego = torch.where(torch.isnan(scores_in_ego),
-                                    torch.zeros_like(scores_in_ego, device=scores_in_ego.device),
-                                    scores_in_ego)
+                                    torch.zeros_like(scores_in_ego, device=scores_in_ego.device), scores_in_ego)
 
         out.append(torch.sum(feature_in_ego * scores_in_ego, dim=0))
     out = torch.stack(out)
@@ -64,7 +61,7 @@ def weighted_fuse(x, score, record_len, affine_matrix, align_corners):
 
 
 class PyramidFusion(ResNetBEVBackbone):
-    def __init__(self, model_cfg):
+    def __init__(self, model_cfg: Mapping):
         """
         Do not downsample in the first layer.
         """
@@ -74,6 +71,7 @@ class PyramidFusion(ResNetBEVBackbone):
             self.resnet = ResNetModified(Bottleneck, model_cfg['layer_nums'], model_cfg['layer_strides'],
                                          model_cfg['num_filters'], inplanes=model_cfg.get('inplanes', 64),
                                          groups=32, width_per_group=4)
+        # TODO: 这个变量有什么深意吗? 为什么要专门打印出来
         self.align_corners = model_cfg.get('align_corners', False)
         # print('Align corners: ', self.align_corners)
         logger.success(f'Align corners: {self.align_corners}')

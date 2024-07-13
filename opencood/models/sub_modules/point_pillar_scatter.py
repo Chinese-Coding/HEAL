@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
+from typing import Mapping, NoReturn, List
 
 import torch
 import torch.nn as nn
+from torch import Tensor
 
 
 class PointPillarScatter(nn.Module):
-    def __init__(self, model_cfg):
+    def __init__(self, model_cfg: Mapping) -> NoReturn:
         super().__init__()
 
         self.num_bev_features = model_cfg['num_features']
@@ -15,12 +17,14 @@ class PointPillarScatter(nn.Module):
 
         assert self.nz == 1
 
-    def forward(self, batch_dict):
+    # def forward(self, batch_dict: Mapping):
+    def forward(self, pillar_features: Tensor, coords: Tensor) -> List[Tensor]:
         """
         将生成的pillar按照坐标索引还原到原空间中
         Args:
-            pillar_features:(M, 64)
-            coords:(M, 4) 第一维是batch_index
+            batch_dict:
+                pillar_features:(M, 64)
+                coords:(M, 4) 第一维是batch_index
 
         Returns:
             batch_spatial_features:(4, 64, H, W)
@@ -39,7 +43,7 @@ class PointPillarScatter(nn.Module):
             Something like clockwise rotation of 90 degree.
 
         """
-        pillar_features, coords = batch_dict['pillar_features'], batch_dict['voxel_coords']
+        # pillar_features, coords = batch_dict['pillar_features'], batch_dict['voxel_coords']
         batch_spatial_features = []
         batch_size = coords[:, 0].max().int().item() + 1
 
@@ -66,6 +70,6 @@ class PointPillarScatter(nn.Module):
         # It put y axis(in lidar frame) as image height. [..., 200, 704]
         batch_spatial_features = batch_spatial_features.view(batch_size, self.num_bev_features * self.nz,
                                                              self.ny, self.nx)
-        batch_dict['spatial_features'] = batch_spatial_features
-
-        return batch_dict
+        return batch_spatial_features
+        # batch_dict['spatial_features'] = batch_spatial_features
+        # return batch_dict

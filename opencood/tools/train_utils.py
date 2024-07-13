@@ -4,18 +4,20 @@
 
 import glob
 import importlib
-from typing import overload
-
-import yaml
 import os
 import re
-from datetime import datetime
 import shutil
+from datetime import datetime
+from typing import overload, AnyStr, Mapping
+
 import torch
 import torch.optim as optim
+import yaml
 from torch import nn
 
 from opencood.logger import get_logger
+from opencood.loss import losses
+from opencood.models import backbones
 
 logger = get_logger()
 
@@ -157,27 +159,19 @@ def setup_train(hypes: dict):
 
 
 @overload
-def create_model(backbone_name: str, backbone_config: dict) -> nn.Module:
-    model_filename = "opencood.models." + backbone_name
-    model_lib = importlib.import_module(model_filename)
-    model = None
-    target_model_name = backbone_name.replace('_', '')
-
-    for name, cls in model_lib.__dict__.items():
-        if name.lower() == target_model_name.lower():
-            model = cls
-            # TODO: 找到就直接 break?
-
-    if model is None:
+def create_model(backbone_name: AnyStr, backbone_config: Mapping) -> nn.Module:
+    try:
+        model = backbones[backbone_name]
+    except KeyError:
         logger.error(f'backbone not found in models folder. '
-                     f'Please make sure you have a python file named {model_filename} '
+                     f'Please make sure you have a python file named {backbone_name} '
                      f'and has a class called target_model_name ignoring upper/lower case')
         exit(0)
     instance = model(backbone_config)
     return instance
 
 
-def create_model(hypes):
+def create_model(hypes: Mapping) -> nn.Module:
     """
     Import the module "models/[model_name].py
 
@@ -212,6 +206,17 @@ def create_model(hypes):
     instance = model(backbone_config)
     return instance
 
+
+def create_loss(loss_func_name, loss_func_config):
+    try:
+        loss_func = losses[loss_func_name]
+    except KeyError:
+        logger.error(f'backbone not found in models folder. '
+                     f'Please make sure you have a python file named {loss_func_name} '
+                     f'and has a class called target_model_name ignoring upper/lower case')
+        exit(0)
+    criterion = loss_func(loss_func_config)
+    return criterion
 
 def create_loss(hypes):
     """

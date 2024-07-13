@@ -68,8 +68,6 @@ class OPV2VBaseDataset(Dataset):
         self.scenario_folders = sorted([os.path.join(root_dir, x)
                                         for x in os.listdir(root_dir) if
                                         os.path.isdir(os.path.join(root_dir, x))])
-
-        self.logger = logging.getLogger(__name__)
         # 注释掉该函数, 改为由子类调用.
         # self.reinitialize()
 
@@ -108,6 +106,7 @@ class OPV2VBaseDataset(Dataset):
             """
             make the first cav to be ego modality
             """
+            # TODO: `heterogeneous` 属性位于子类中, 该函数通过子类进行访问, 所以是又这个属性的, `adaptor` 也是这个道理.
             if getattr(self, "heterogeneous", False):
                 scenario_name = scenario_folder.split("/")[-1]
                 cav_list = self.adaptor.reorder_cav_list(cav_list, scenario_name)

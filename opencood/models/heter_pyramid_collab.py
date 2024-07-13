@@ -3,14 +3,16 @@
 HEAL: An Extensible Framework for Open Heterogeneous Collaborative Perception 
 """
 
-import importlib
 from collections import OrderedDict, Counter
+from typing import Dict, Mapping
 
 import torch
 import torch.nn as nn
 import torchvision
 
+from opencood.logger import get_logger
 from opencood.models.fuse_modules.pyramid_fuse import PyramidFusion
+from opencood.models.heter_encoders import encoders
 from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
 from opencood.models.sub_modules.downsample_conv import DownsampleConv
 from opencood.models.sub_modules.feature_alignnet import AlignNet
@@ -18,14 +20,16 @@ from opencood.models.sub_modules.naive_compress import NaiveCompressor
 from opencood.utils.model_utils import check_trainable_module
 from opencood.utils.transformation_utils import normalize_pairwise_tfm
 
+logger = get_logger()
+
 
 class HeterPyramidCollab(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args: Dict):
         super().__init__()
-        self.args = args
         modality_name_list = list(args.keys())
         # 把 model-args-m${number}选出来
         modality_name_list = [x for x in modality_name_list if x.startswith("m") and x[1:].isdigit()]
+        # self.modality_name_set = set(modality_name_list)
         self.modality_name_list = modality_name_list
 
         # TODO: 我总是认为配置文件里面参数的名字应该和程序里变量的名字一致才比较好.
@@ -42,15 +46,23 @@ class HeterPyramidCollab(nn.Module):
             self.sensor_type_dict[modality_name] = sensor_name
 
             # import model
-            encoder_filename = "opencood.models.heter_encoders"
-            encoder_lib = importlib.import_module(encoder_filename)
-            encoder_class = None
-            target_model_name = model_setting['core_method'].replace('_', '')
-
-            for name, cls in encoder_lib.__dict__.items():
-                if name.lower() == target_model_name.lower():
-                    encoder_class = cls
-                    # TODO: 如果找到了直接 break 是否更好一些呢?
+            # encoder_filename = "opencood.models.heter_encoders"
+            # encoder_lib = importlib.import_module(encoder_filename)
+            # encoder_class = None
+            # target_model_name = model_setting['core_method'].replace('_', '')
+            #
+            # for name, cls in encoder_lib.__dict__.items():
+            #     if name.lower() == target_model_name.lower():
+            #         encoder_class = cls
+            # TODO: 如果找到了直接 break 是否更好一些呢?
+            try:
+                encoder_class = encoders[model_setting['core_method']]
+            except KeyError:
+                available_encoders = ', '.join(encoders.keys())
+                logger.error(
+                    f'不受支持的 encoder. 选择的 encoder 为: {model_setting["core_method"]}.'
+                    f'可用的 encoders: {available_encoders}')
+                exit(-1)
 
             """Encoder building"""
             # setattr 是 Python 内置的一个函数，用于动态地为对象设置属性, python真的十分灵活......
@@ -138,7 +150,7 @@ class HeterPyramidCollab(nn.Module):
         for p in self.compressor.parameters():
             p.requires_grad_(True)
 
-    def forward(self, data_dict):
+    def forward(self, data_dict: Mapping):
         output_dict = {'pyramid': 'collab'}
         agent_modality_list = data_dict['agent_modality_list']
         affine_matrix = normalize_pairwise_tfm(data_dict['pairwise_t_matrix'], self.H, self.W, self.fake_voxel_size)

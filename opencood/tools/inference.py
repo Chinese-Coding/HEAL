@@ -12,28 +12,26 @@ from torch.utils.data import DataLoader
 
 import opencood.hypes_yaml.yaml_utils as yaml_utils
 from opencood.data_utils.datasets import build_dataset
+from opencood.logger import get_logger
 from opencood.tools import train_utils, inference_utils
 from opencood.utils import eval_utils
 from opencood.utils.common_utils import update_dict
 from opencood.visualization import simple_vis
 
 torch.multiprocessing.set_sharing_strategy('file_system')
+logger = get_logger()
 
 
 def test_parser():
     parser = argparse.ArgumentParser(description="synthetic data generation")
-    parser.add_argument('--model_dir', type=str, required=True,
-                        help='Continued training path')
+    parser.add_argument('--model_dir', type=str, required=True, help='Continued training path')
     parser.add_argument('--fusion_method', type=str, default='intermediate',
                         help='no, no_w_uncertainty, late, early or intermediate')
-    parser.add_argument('--save_vis_interval', type=int, default=40,
-                        help='interval of saving visualization')
-    parser.add_argument('--save_npy', action='store_true',
-                        help='whether to save prediction and gt result in npy file')
+    parser.add_argument('--save_vis_interval', type=int, default=40, help='interval of saving visualization')
+    parser.add_argument('--save_npy', action='store_true', help='whether to save prediction and gt result in npy file')
     parser.add_argument('--range', type=str, default="102.4,102.4",
                         help="detection range is [-102.4, +102.4, -102.4, +102.4]")
-    parser.add_argument('--no_score', action='store_true',
-                        help="whether print the score of prediction")
+    parser.add_argument('--no_score', action='store_true', help="whether print the score of prediction")
     parser.add_argument('--note', default="", type=str, help="any other thing?")
     opt = parser.parse_args()
     return opt
@@ -108,13 +106,9 @@ def main():
     opencood_dataset = build_dataset(hypes, visualize=True, train=False)
     # opencood_dataset_subset = Subset(opencood_dataset, range(640,2100))
     # data_loader = DataLoader(opencood_dataset_subset,
-    data_loader = DataLoader(opencood_dataset,
-                             batch_size=1,
-                             num_workers=4,
-                             collate_fn=opencood_dataset.collate_batch_test,
-                             shuffle=False,
-                             pin_memory=False,
-                             drop_last=False)
+    data_loader = DataLoader(opencood_dataset, batch_size=1, num_workers=4,
+                             collate_fn=opencood_dataset.collate_batch_test, shuffle=False,
+                             pin_memory=False, drop_last=False)
 
     # Create the dictionary for evaluation
     result_stat = {0.3: {'tp': [], 'fp': [], 'gt': 0, 'score': []},
@@ -131,30 +125,17 @@ def main():
             batch_data = train_utils.to_device(batch_data, device)
 
             if opt.fusion_method == 'late':
-                infer_result = inference_utils.inference_late_fusion(batch_data,
-                                                                     model,
-                                                                     opencood_dataset)
+                infer_result = inference_utils.inference_late_fusion(batch_data, model, opencood_dataset)
             elif opt.fusion_method == 'early':
-                infer_result = inference_utils.inference_early_fusion(batch_data,
-                                                                      model,
-                                                                      opencood_dataset)
+                infer_result = inference_utils.inference_early_fusion(batch_data, model, opencood_dataset)
             elif opt.fusion_method == 'intermediate':
-                infer_result = inference_utils.inference_intermediate_fusion(batch_data,
-                                                                             model,
-                                                                             opencood_dataset)
+                infer_result = inference_utils.inference_intermediate_fusion(batch_data, model, opencood_dataset)
             elif opt.fusion_method == 'no':
-                infer_result = inference_utils.inference_no_fusion(batch_data,
-                                                                   model,
-                                                                   opencood_dataset)
+                infer_result = inference_utils.inference_no_fusion(batch_data, model, opencood_dataset)
             elif opt.fusion_method == 'no_w_uncertainty':
-                infer_result = inference_utils.inference_no_fusion_w_uncertainty(batch_data,
-                                                                                 model,
-                                                                                 opencood_dataset)
+                infer_result = inference_utils.inference_no_fusion_w_uncertainty(batch_data, model, opencood_dataset)
             elif opt.fusion_method == 'single':
-                infer_result = inference_utils.inference_no_fusion(batch_data,
-                                                                   model,
-                                                                   opencood_dataset,
-                                                                   single_gt=True)
+                infer_result = inference_utils.inference_no_fusion(batch_data, model, opencood_dataset, single_gt=True)
             else:
                 raise NotImplementedError('Only single, no, no_w_uncertainty, early, late and intermediate'
                                           'fusion is supported.')
@@ -163,38 +144,22 @@ def main():
             gt_box_tensor = infer_result['gt_box_tensor']
             pred_score = infer_result['pred_score']
 
-            eval_utils.caluclate_tp_fp(pred_box_tensor,
-                                       pred_score,
-                                       gt_box_tensor,
-                                       result_stat,
-                                       0.3)
-            eval_utils.caluclate_tp_fp(pred_box_tensor,
-                                       pred_score,
-                                       gt_box_tensor,
-                                       result_stat,
-                                       0.5)
-            eval_utils.caluclate_tp_fp(pred_box_tensor,
-                                       pred_score,
-                                       gt_box_tensor,
-                                       result_stat,
-                                       0.7)
+            eval_utils.caluclate_tp_fp(pred_box_tensor, pred_score, gt_box_tensor, result_stat, 0.3)
+            eval_utils.caluclate_tp_fp(pred_box_tensor, pred_score, gt_box_tensor, result_stat, 0.5)
+            eval_utils.caluclate_tp_fp(pred_box_tensor, pred_score, gt_box_tensor, result_stat, 0.7)
             if opt.save_npy:
                 npy_save_path = os.path.join(opt.model_dir, 'npy')
                 if not os.path.exists(npy_save_path):
                     os.makedirs(npy_save_path)
-                inference_utils.save_prediction_gt(pred_box_tensor,
-                                                   gt_box_tensor,
-                                                   batch_data['ego'][
-                                                       'origin_lidar'][0],
-                                                   i,
-                                                   npy_save_path)
+                inference_utils.save_prediction_gt(pred_box_tensor, gt_box_tensor,
+                                                   batch_data['ego']['origin_lidar'][0], i, npy_save_path)
 
             if not opt.no_score:
                 infer_result.update({'score_tensor': pred_score})
 
             if getattr(opencood_dataset, "heterogeneous", False):
                 cav_box_np, agent_modality_list = inference_utils.get_cav_box(batch_data)
-                infer_result.update({"cav_box_np": cav_box_np, \
+                infer_result.update({"cav_box_np": cav_box_np,
                                      "agent_modality_list": agent_modality_list})
 
             if (i % opt.save_vis_interval == 0) and (pred_box_tensor is not None or gt_box_tensor is not None):
@@ -212,17 +177,12 @@ def main():
                 #                     left_hand=left_hand)
 
                 vis_save_path = os.path.join(vis_save_path_root, 'bev_%05d.png' % i)
-                simple_vis.visualize(infer_result,
-                                     batch_data['ego'][
-                                         'origin_lidar'][0],
+                simple_vis.visualize(infer_result, batch_data['ego']['origin_lidar'][0],
                                      hypes['postprocess']['gt_range'],
-                                     vis_save_path,
-                                     method='bev',
-                                     left_hand=left_hand)
+                                     vis_save_path, method='bev', left_hand=left_hand)
         torch.cuda.empty_cache()
 
-    _, ap50, ap70 = eval_utils.eval_final_results(result_stat,
-                                                  opt.model_dir, infer_info)
+    _, ap50, ap70 = eval_utils.eval_final_results(result_stat, opt.model_dir, infer_info)
 
 
 if __name__ == '__main__':

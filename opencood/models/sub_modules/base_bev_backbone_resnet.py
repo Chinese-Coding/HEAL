@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
+from typing import Mapping
 
 import numpy as np
 import torch
@@ -16,17 +17,14 @@ class ResNetBEVBackbone(nn.Module):
     TODO: 这个类应该好好看看, 真的没看明白......
     """
 
-    def __init__(self, model_cfg):
+    def __init__(self, model_cfg: Mapping):
         super().__init__()
         """
         一些简单的参数配置
-        
-        如果在模型参数中定义了层数, 那么就应该校验一下层参数列表的长度是否等于层数
         """
+        # 如果在模型参数中定义了层数, 那么就应该校验一下层参数列表的长度是否等于层数
         if 'layer_nums' in model_cfg:
-            assert len(model_cfg['layer_nums']) == \
-                   len(model_cfg['layer_strides']) == \
-                   len(model_cfg['num_filters'])
+            assert len(model_cfg['layer_nums']) == len(model_cfg['layer_strides']) == len(model_cfg['num_filters'])
 
             layer_nums = model_cfg['layer_nums']
             layer_strides = model_cfg['layer_strides']

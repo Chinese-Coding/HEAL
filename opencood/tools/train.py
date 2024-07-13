@@ -25,12 +25,9 @@ def train_parser():
     解析的命令行参数
     """
     parser = argparse.ArgumentParser(description="synthetic data generation")
-    parser.add_argument("--hypes_yaml", "-y", type=str, required=True,
-                        help='data generation yaml file needed ')
-    parser.add_argument('--model_dir', default='',
-                        help='Continued training path')
-    parser.add_argument('--fusion_method', '-f', default="intermediate",
-                        help='passed to inference.')
+    parser.add_argument("--hypes_yaml", "-y", type=str, required=True, help='data generation yaml file needed')
+    parser.add_argument('--model_dir', default='', help='Continued training path')
+    parser.add_argument('--fusion_method', '-f', default="intermediate", help='passed to inference.')
     opt = parser.parse_args()
     return opt
 
@@ -55,7 +52,7 @@ def main():
     logger.success('---数据集加载完毕---')
     logger.success('Creating Model')
 
-    model = train_utils.create_model(hypes)
+    model = train_utils.create_model(hypes['model']['core_method'], hypes['model']['args'])
 
     # record lowest validation loss checkpoint.
     lowest_val_loss = 1e5
@@ -95,6 +92,7 @@ def main():
         exit(-1)
     logger.success(f'model 类型: {type(model)}')
     logger.success(f'loss 类型: {type(criterion)}')
+    logger.success(f'optimizer 类型: {type(optimizer)}')
 
     # record training
     writer = SummaryWriter(saved_path)
@@ -122,9 +120,12 @@ def main():
             # print("No model_train_init function")
             logger.error('No model_train_init function')
 
-        for i, batch_data in tqdm(enumerate(train_loader), total=len(train_loader)):
+        train_loader_len = len(train_loader)
+        pbar = tqdm(enumerate(train_loader), total=train_loader_len, desc=f"Epoch {epoch}")
+        for i, batch_data in pbar:
             if batch_data is None or batch_data['ego']['object_bbx_mask'].sum() == 0:
                 continue
+
             model.zero_grad()
             optimizer.zero_grad()
             batch_data = train_utils.to_device(batch_data, device)
@@ -132,13 +133,15 @@ def main():
             output_dict = model(batch_data['ego'])
 
             final_loss = criterion(output_dict, batch_data['ego']['label_dict'])
-            criterion.logging(epoch, i, len(train_loader), writer)
+            loss_dict = criterion.logging(epoch, i, train_loader_len, writer)
 
             if supervise_single_flag:
                 final_loss += criterion(output_dict, batch_data['ego']['label_dict_single'], suffix="_single") * hypes[
                     'train_params'].get("single_weight", 1)
-                criterion.logging(epoch, i, len(train_loader), writer, suffix="_single")
+                loss_dict = criterion.logging(epoch, i, train_loader_len, writer, suffix="_single")
 
+            # Update progress bar with current loss
+            pbar.set_postfix({k: f'{v:.4f}' for k, v in loss_dict.items()})
             # back-propagation
             final_loss.backward()
             optimizer.step()
@@ -153,7 +156,8 @@ def main():
             valid_ave_loss = []
 
             with torch.no_grad():
-                for i, batch_data in tqdm(enumerate(val_loader), total=len(val_loader)):
+                pbar = tqdm(enumerate(val_loader), total=len(val_loader), desc='Validation Loss')
+                for i, batch_data in pbar:
                     if batch_data is None:
                         continue
                     model.zero_grad()
@@ -165,9 +169,11 @@ def main():
                     output_dict = model(batch_data['ego'])
 
                     final_loss = criterion(output_dict, batch_data['ego']['label_dict'])
-                    # print(f'val loss {final_loss:.3f}')
                     logger.info(f'val loss {final_loss:.3f}')
                     valid_ave_loss.append(final_loss.item())
+
+                    # Update progress bar with current loss
+                    pbar.set_postfix({'loss': f'{final_loss:.3f}'})
 
             valid_ave_loss = statistics.mean(valid_ave_loss)
             logger.success(f'At epoch {epoch}, the validation loss is {valid_ave_loss}')
@@ -186,7 +192,7 @@ def main():
         during_time = (datetime.now() - epoch_start_time).total_seconds()
         epoch_times.append({epoch: during_time})
 
-        logger.success(f'Epoch {epoch}, Train Time: {during_time:.2f} seconds')
+        logger.success(f'Epoch {epoch}, Total Time (train + validation): {during_time:.2f} seconds')
         # scheduler.step(epoch)
         logger.success(f'Dataset Building for {epoch + 1}')
         opencood_train_dataset.reinitialize()

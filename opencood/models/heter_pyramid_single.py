@@ -4,30 +4,24 @@ HEAL: An Extensible Framework for Open Heterogeneous Collaborative Perception
 """
 
 from collections import OrderedDict
+from typing import Dict
 
 import torch.nn as nn
 import torchvision
 
 from opencood.logger import get_logger
 from opencood.models.fuse_modules.pyramid_fuse import PyramidFusion
-from opencood.models.heter_encoders import LiftSplatShoot
-from opencood.models.heter_encoders import PointPillar
-from opencood.models.heter_encoders import SECOND
+from opencood.models.heter_encoders import encoders
 from opencood.models.sub_modules.base_bev_backbone_resnet import ResNetBEVBackbone
 from opencood.models.sub_modules.downsample_conv import DownsampleConv
 from opencood.models.sub_modules.feature_alignnet import AlignNet
 from opencood.utils.model_utils import check_trainable_module, fix_bn
 
-encoders = {
-    'second': SECOND,
-    'lift_splat_shoot': LiftSplatShoot,
-    'point_pillar': PointPillar
-}
-
 logger = get_logger()
 
+
 class HeterPyramidSingle(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args: Dict):
         super().__init__()
         modality_name_list = list(args.keys())
         modality_name_list = [x for x in modality_name_list if x.startswith("m") and x[1:].isdigit()]
@@ -58,7 +52,9 @@ class HeterPyramidSingle(nn.Module):
                 encoder_class = encoders[model_setting['core_method']]
             except KeyError:
                 available_encoders = ', '.join(encoders.keys())
-                logger.error(f'不受支持的 encoder. 新选择的 encoder: {model_setting["core_method"]}. 可用的 encoders: {available_encoders}')
+                logger.error(
+                    f'不受支持的 encoder. 选择的 encoder 为: {model_setting["core_method"]}.'
+                    f'可用的 encoders: {available_encoders}')
                 exit(-1)
 
             # build encoder
@@ -106,6 +102,7 @@ class HeterPyramidSingle(nn.Module):
 
         # self.model_train_init() # TODO: 在主函数中已经调用, 这里有必要再调用一次吗?
         # check again which module is not fixed.
+        # TODO: 为什么要进行这一步的检查呢? 这一步的检查有什么意义吗?
         check_trainable_module(self)
 
     def model_train_init(self):

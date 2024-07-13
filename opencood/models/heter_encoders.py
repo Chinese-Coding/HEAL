@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
-
+from typing import AnyStr, Mapping, NoReturn, List
 
 import numpy as np
 import torch
 import torch.nn as nn
+from torch import Tensor
 
 from opencood.models.sub_modules.height_compression import HeightCompression
 from opencood.models.sub_modules.lss_submodule import CamEncode, CamEncode_Resnet101
@@ -17,7 +18,7 @@ from opencood.utils.camera_utils import gen_dx_bx, cumsum_trick, QuickCumsum, de
 
 
 class PointPillar(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args: Mapping) -> NoReturn:
         super().__init__()
         grid_size = (np.array(args['lidar_range'][3:6]) - np.array(args['lidar_range'][0:3])) / np.array(
             args['voxel_size'])
@@ -26,27 +27,29 @@ class PointPillar(nn.Module):
         args['point_pillar_scatter']['grid_size'] = grid_size
 
         # Pillar VFE
-        self.pillar_vfe = PillarVFE(args['pillar_vfe'], num_point_features=4, voxel_size=args['voxel_size'],
-                                    point_cloud_range=args['lidar_range'])
+        self.pillar_vfe = PillarVFE(args['pillar_vfe'], 4, args['voxel_size'], args['lidar_range'])
         self.scatter = PointPillarScatter(args['point_pillar_scatter'])
 
-    def forward(self, data_dict, modality_name):
+    def forward(self, data_dict: Mapping, modality_name: AnyStr) -> List[Tensor]:
         voxel_features = data_dict[f'inputs_{modality_name}']['voxel_features']
         voxel_coords = data_dict[f'inputs_{modality_name}']['voxel_coords']
         voxel_num_points = data_dict[f'inputs_{modality_name}']['voxel_num_points']
 
-        batch_dict = {'voxel_features': voxel_features,
-                      'voxel_coords': voxel_coords,
-                      'voxel_num_points': voxel_num_points}
+        pillar_features = self.pillar_vfe(voxel_features, voxel_num_points, voxel_coords)
+        return self.scatter(pillar_features, voxel_coords)
 
-        batch_dict = self.pillar_vfe(batch_dict)
-        batch_dict = self.scatter(batch_dict)
-        lidar_feature_2d = batch_dict['spatial_features']  # H0, W0
-        return lidar_feature_2d
+        # TODO: 这里可能有 bug
+        # batch_dict = {'voxel_features': voxel_features,
+        #               'voxel_coords': voxel_coords,
+        #               'voxel_num_points': voxel_num_points}
+        # batch_dict = self.pillar_vfe(batch_dict)
+        # batch_dict = self.scatter(batch_dict)
+        # lidar_feature_2d = batch_dict['spatial_features']  # H0, W0
+        # return lidar_feature_2d
 
 
 class SECOND(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args: Mapping):
         super().__init__()
         lidar_range = np.array(args['lidar_range'])
         grid_size = np.round((lidar_range[3:6] - lidar_range[:3]) / np.array(args['voxel_size'])).astype(np.int64)
@@ -306,3 +309,10 @@ class LiftSplatShootVoxel(LiftSplatShoot):
         # final = torch.max(final.unbind(dim=2), 1)[0]  # 消除掉z维
         final = torch.max(final, 2)[0]  # 消除掉z维
         return final  # final: 4 x 64 x 240 x 240  # B, C, H, W
+
+
+encoders = {
+    'second': SECOND,
+    'lift_splat_shoot': LiftSplatShoot,
+    'point_pillar': PointPillar
+}
