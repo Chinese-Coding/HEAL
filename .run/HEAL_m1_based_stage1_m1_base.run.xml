@@ -6,7 +6,7 @@
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
-      <env name="CUDA_VISIBLE_DEVICES" value="1" />
+      <env name="CUDA_VISIBLE_DEVICES" value="0" />
     </envs>
     <option name="SDK_HOME" value="" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
@@ -15,7 +15,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="opencood/tools/train.py" />
-    <option name="PARAMETERS" value="-y None --model_dir opencood/logs/HEAL_m1_based/stage1/m1_base" />
+    <option name="PARAMETERS" value="-y None --model_dir opencood/logs/HEAL_m1_based/stage1" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

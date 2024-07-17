@@ -5,14 +5,12 @@
 import os
 from collections import OrderedDict
 from functools import partial
+from typing import Mapping
 
 import numpy as np
-from torch.utils.data import Dataset
 
 import opencood.utils.pcd_utils as pcd_utils
-from opencood.data_utils.augmentor.data_augmentor import DataAugmentor
-from opencood.data_utils.post_processor import build_postprocessor
-from opencood.data_utils.pre_processor import build_preprocessor
+from opencood.data_utils.datasets.basedataset.base_dataset import BaseDataset
 from opencood.utils.camera_utils import load_camera_data, load_intrinsic_DAIR_V2X
 from opencood.utils.common_utils import read_json
 from opencood.utils.transformation_utils import inf_side_rot_and_trans_to_trasnformation_matrix
@@ -20,19 +18,11 @@ from opencood.utils.transformation_utils import tfm_to_pose, rot_and_trans_to_tr
 from opencood.utils.transformation_utils import veh_side_rot_and_trans_to_trasnformation_matrix
 
 
-class DAIRV2XBaseDataset(Dataset):
-    def __init__(self, params, visualize, train=True):
-        self.params = params
-        self.visualize = visualize
-        self.train = train
+class DAIRV2XBaseDataset(BaseDataset):
+    def __init__(self, params: Mapping, visualize: bool, train=True):
+        super().__init__(params, visualize, train)
 
-        self.pre_processor = build_preprocessor(params["preprocess"], train)
-        self.post_processor = build_postprocessor(params["postprocess"], train)
         self.post_processor.generate_gt_bbx = self.post_processor.generate_gt_bbx_by_iou
-        if 'data_augment' in params:  # late and early
-            self.data_augmentor = DataAugmentor(params['data_augment'], train)
-        else:  # intermediate
-            self.data_augmentor = None
 
         if 'clip_pc' in params['fusion']['args'] and params['fusion']['args']['clip_pc']:
             self.clip_pc = True
@@ -44,18 +34,12 @@ class DAIRV2XBaseDataset(Dataset):
         else:
             self.max_cav = params['train_params']['max_cav']
 
-        self.load_lidar_file = True if 'lidar' in params['input_source'] or self.visualize else False
-        self.load_camera_file = True if 'camera' in params['input_source'] else False
-        self.load_depth_file = True if 'depth' in params['input_source'] else False
-
         assert self.load_depth_file is False
 
         self.label_type = params['label_type']  # 'lidar' or 'camera'
         self.generate_object_center = self.generate_object_center_lidar if self.label_type == "lidar" \
             else self.generate_object_center_camera
 
-        if self.load_camera_file:
-            self.data_aug_conf = params["fusion"]["args"]["data_aug_conf"]
 
         if self.train:
             split_dir = params['root_dir']
@@ -71,9 +55,6 @@ class DAIRV2XBaseDataset(Dataset):
             veh_frame_id = frame_info['vehicle_image_path'].split("/")[-1].replace(".jpg", "")
             self.co_data[veh_frame_id] = frame_info
 
-        if "noise_setting" not in self.params:
-            self.params['noise_setting'] = OrderedDict()
-            self.params['noise_setting']['add_noise'] = False
 
     def reinitialize(self):
         pass
@@ -134,48 +115,42 @@ class DAIRV2XBaseDataset(Dataset):
         if self.load_camera_file:
             data[0]['camera_data'] = load_camera_data([os.path.join(self.root_dir, frame_info["vehicle_image_path"])])
             data[0]['params']['camera0'] = OrderedDict()
-            data[0]['params']['camera0']['extrinsic'] = rot_and_trans_to_trasnformation_matrix( \
+            data[0]['params']['camera0']['extrinsic'] = rot_and_trans_to_trasnformation_matrix(
                 read_json(
                     os.path.join(self.root_dir, 'vehicle-side/calib/lidar_to_camera/' + str(veh_frame_id) + '.json')))
-            data[0]['params']['camera0']['intrinsic'] = load_intrinsic_DAIR_V2X( \
+            data[0]['params']['camera0']['intrinsic'] = load_intrinsic_DAIR_V2X(
                 read_json(
                     os.path.join(self.root_dir, 'vehicle-side/calib/camera_intrinsic/' + str(veh_frame_id) + '.json')))
 
             data[1]['camera_data'] = load_camera_data(
                 [os.path.join(self.root_dir, frame_info["infrastructure_image_path"])])
             data[1]['params']['camera0'] = OrderedDict()
-            data[1]['params']['camera0']['extrinsic'] = rot_and_trans_to_trasnformation_matrix( \
+            data[1]['params']['camera0']['extrinsic'] = rot_and_trans_to_trasnformation_matrix(
                 read_json(os.path.join(self.root_dir, 'infrastructure-side/calib/virtuallidar_to_camera/' + str(
                     inf_frame_id) + '.json')))
-            data[1]['params']['camera0']['intrinsic'] = load_intrinsic_DAIR_V2X( \
+            data[1]['params']['camera0']['intrinsic'] = load_intrinsic_DAIR_V2X(
                 read_json(os.path.join(self.root_dir,
                                        'infrastructure-side/calib/camera_intrinsic/' + str(inf_frame_id) + '.json')))
 
         if self.load_lidar_file or self.visualize:
-            data[0]['lidar_np'], _ = pcd_utils.read_pcd(
-                os.path.join(self.root_dir, frame_info["vehicle_pointcloud_path"]))
-            data[1]['lidar_np'], _ = pcd_utils.read_pcd(
-                os.path.join(self.root_dir, frame_info["infrastructure_pointcloud_path"]))
+            data[0]['lidar_np'], _ = \
+                pcd_utils.read_pcd(os.path.join(self.root_dir, frame_info["vehicle_pointcloud_path"]))
+            data[1]['lidar_np'], _ = \
+                pcd_utils.read_pcd(os.path.join(self.root_dir, frame_info["infrastructure_pointcloud_path"]))
 
         # Label for single side
-        data[0]['params']['vehicles_single_front'] = read_json(os.path.join(self.root_dir, \
-                                                                            'vehicle-side/label/lidar_backup/{}.json'.format(
-                                                                                veh_frame_id)))
-        data[0]['params']['vehicles_single_all'] = read_json(os.path.join(self.root_dir, \
-                                                                          'vehicle-side/label/lidar/{}.json'.format(
-                                                                              veh_frame_id)))
-        data[1]['params']['vehicles_single_front'] = read_json(os.path.join(self.root_dir, \
-                                                                            'infrastructure-side/label/virtuallidar/{}.json'.format(
-                                                                                inf_frame_id)))
-        data[1]['params']['vehicles_single_all'] = read_json(os.path.join(self.root_dir, \
-                                                                          'infrastructure-side/label/virtuallidar/{}.json'.format(
-                                                                              inf_frame_id)))
+        data[0]['params']['vehicles_single_front'] = \
+            read_json(os.path.join(self.root_dir, f'vehicle-side/label/lidar_backup/{veh_frame_id}.json'))
+        data[0]['params']['vehicles_single_all'] = \
+            read_json(os.path.join(self.root_dir, f'vehicle-side/label/lidar/{veh_frame_id}.json'))
+        data[1]['params']['vehicles_single_front'] = \
+            read_json(os.path.join(self.root_dir, f'infrastructure-side/label/virtuallidar/{inf_frame_id}.json'))
+        data[1]['params']['vehicles_single_all'] = \
+            read_json(os.path.join(self.root_dir, f'infrastructure-side/label/virtuallidar/{inf_frame_id}.json'))
 
         if getattr(self, "heterogeneous", False):
-            self.generate_object_center_lidar = \
-                partial(self.generate_object_center_single_hetero, modality='lidar')
-            self.generate_object_center_camera = \
-                partial(self.generate_object_center_single_hetero, modality='camera')
+            self.generate_object_center_lidar = partial(self.generate_object_center_single_hetero, modality='lidar')
+            self.generate_object_center_camera = partial(self.generate_object_center_single_hetero, modality='camera')
 
             # by default
             data[0]['modality_name'] = 'm1'
@@ -209,20 +184,15 @@ class DAIRV2XBaseDataset(Dataset):
     def __getitem__(self, idx):
         pass
 
-    def generate_object_center_lidar(self,
-                                     cav_contents,
-                                     reference_lidar_pose):
+    def generate_object_center_lidar(self, cav_contents, reference_lidar_pose):
         """
         reference lidar 's coordinate 
         """
         for cav_content in cav_contents:
             cav_content['params']['vehicles'] = cav_content['params']['vehicles_all']
-        return self.post_processor.generate_object_center_dairv2x(cav_contents,
-                                                                  reference_lidar_pose)
+        return self.post_processor.generate_object_center_dairv2x(cav_contents, reference_lidar_pose)
 
-    def generate_object_center_camera(self,
-                                      cav_contents,
-                                      reference_lidar_pose):
+    def generate_object_center_camera(self, cav_contents, reference_lidar_pose):
         """
         reference lidar 's coordinate 
         """
@@ -267,25 +237,3 @@ class DAIRV2XBaseDataset(Dataset):
         camera_intrinsic = params["camera%d" % camera_id]['intrinsic'].astype(np.float32)
         return camera_to_lidar, camera_intrinsic
 
-    def augment(self, lidar_np, object_bbx_center, object_bbx_mask):
-        """
-        Given the raw point cloud, augment by flipping and rotation.
-        Parameters
-        ----------
-        lidar_np : np.ndarray
-            (n, 4) shape
-        object_bbx_center : np.ndarray
-            (n, 7) shape to represent bbx's x, y, z, h, w, l, yaw
-        object_bbx_mask : np.ndarray
-            Indicate which elements in object_bbx_center are padded.
-        """
-        tmp_dict = {'lidar_np': lidar_np,
-                    'object_bbx_center': object_bbx_center,
-                    'object_bbx_mask': object_bbx_mask}
-        tmp_dict = self.data_augmentor.forward(tmp_dict)
-
-        lidar_np = tmp_dict['lidar_np']
-        object_bbx_center = tmp_dict['object_bbx_center']
-        object_bbx_mask = tmp_dict['object_bbx_mask']
-
-        return lidar_np, object_bbx_center, object_bbx_mask

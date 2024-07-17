@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
+from typing import Mapping
 
 from opencood.data_utils.datasets.basedataset.opv2v_basedataset import OPV2VBaseDataset
 
 
 # All the same as OPV2V
 class V2XSETBaseDataset(OPV2VBaseDataset):
-    def __init__(self, params, visulize, train=True):
-        super().__init__(params, visulize, train)
+    def __init__(self, params: Mapping, visualize: bool, train=True):
+        super().__init__(params, visualize, train)
 
         if self.load_camera_file is True:  # '2021_09_09_13_20_58'. This scenario has only 3 camera files?
             scenario_folders_new = [x for x in self.scenario_folders if '2021_09_09_13_20_58' not in x]
@@ -23,6 +24,4 @@ class V2XSETBaseDataset(OPV2VBaseDataset):
 
         Suppose the detection range of camera is within 50m
         """
-        return self.post_processor.generate_object_center_v2xset_camera(
-            cav_contents, reference_lidar_pose
-        )
+        return self.post_processor.generate_object_center_v2xset_camera(cav_contents, reference_lidar_pose)

@@ -11,9 +11,10 @@ import open3d as o3d
 import numpy as np
 from pypcd import pypcd
 
-def pcd_to_np(pcd_file):
+
+def pcd_to_np(pcd_file: str):
     """
-    Read  pcd and return numpy array.
+    Read pcd and return numpy array.
 
     Parameters
     ----------
@@ -28,11 +29,12 @@ def pcd_to_np(pcd_file):
         The lidar data in numpy format, shape:(n, 4)
 
     """
+    # TODO: `pcd` 这个变量的类型，需要这个类型里面有什么
     pcd = o3d.io.read_point_cloud(pcd_file)
-
-    xyz = np.asarray(pcd.points)
-    # we save the intensity in the first channel
-    intensity = np.expand_dims(np.asarray(pcd.colors)[:, 0], -1)
+    # 注意：xyz 和 intensity 标注的 shape 在每次读取时点的数量可能不同，但是维度是唯一的
+    xyz = np.asarray(pcd.points)  # xyz.shape = (58547, 3)
+    # we save the intensity (强度) in the first channel
+    intensity = np.expand_dims(np.asarray(pcd.colors)[:, 0], -1) # intensity.shape = (58547, 1)
     pcd_np = np.hstack((xyz, intensity))
 
     return np.asarray(pcd_np, dtype=np.float32)
@@ -56,7 +58,7 @@ def mask_points_by_range(points, limit_range):
         Filtered lidar points.
     """
 
-    mask = (points[:, 0] > limit_range[0]) & (points[:, 0] < limit_range[3])\
+    mask = (points[:, 0] > limit_range[0]) & (points[:, 0] < limit_range[3]) \
            & (points[:, 1] > limit_range[1]) & (
                    points[:, 1] < limit_range[4]) \
            & (points[:, 2] > limit_range[2]) & (
@@ -201,6 +203,7 @@ def downsample_lidar_minimum(pcd_np_list):
         pcd_np_list[i] = downsample_lidar(pcd_np, minimum)
 
     return pcd_np_list
+
 
 def read_pcd(pcd_path):
     pcd = pypcd.PointCloud.from_path(pcd_path)

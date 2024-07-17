@@ -10,24 +10,23 @@ import sys
 import numpy as np
 import torch
 
-from opencood.data_utils.pre_processor.base_preprocessor import \
-    BasePreprocessor
+from opencood.data_utils.pre_processor.base_preprocessor import BasePreprocessor
 
 
 class SpVoxelPreprocessor(BasePreprocessor):
     def __init__(self, preprocess_params, train):
-        super(SpVoxelPreprocessor, self).__init__(preprocess_params,
-                                                  train)
+        super().__init__(preprocess_params, train)
         self.spconv = 1
         try:
             # spconv v1.x
             from spconv.utils import VoxelGeneratorV2 as VoxelGenerator
-        except:
+        except ImportError:
             # spconv v2.x
             from cumm import tensorview as tv
             from spconv.utils import Point2VoxelCPU3d as VoxelGenerator
             self.tv = tv
             self.spconv = 2
+
         self.lidar_range = self.params['cav_lidar_range']
         self.voxel_size = self.params['args']['voxel_size']
         self.max_points_per_voxel = self.params['args']['max_points_per_voxel']
@@ -36,27 +35,18 @@ class SpVoxelPreprocessor(BasePreprocessor):
             self.max_voxels = self.params['args']['max_voxel_train']
         else:
             self.max_voxels = self.params['args']['max_voxel_test']
-
-        grid_size = (np.array(self.lidar_range[3:6]) -
-                     np.array(self.lidar_range[0:3])) / np.array(self.voxel_size)
+        # 调试：[512, 2561 1.]
+        grid_size = (np.array(self.lidar_range[3:6]) - np.array(self.lidar_range[0:3])) / np.array(self.voxel_size)
         self.grid_size = np.round(grid_size).astype(np.int64)
 
         # use sparse conv library to generate voxel
         if self.spconv == 1:
-            self.voxel_generator = VoxelGenerator(
-                voxel_size=self.voxel_size,
-                point_cloud_range=self.lidar_range,
-                max_num_points=self.max_points_per_voxel,
-                max_voxels=self.max_voxels
-            )
+            self.voxel_generator = VoxelGenerator(voxel_size=self.voxel_size, point_cloud_range=self.lidar_range,
+                                                  max_num_points=self.max_points_per_voxel, max_voxels=self.max_voxels)
         else:
-            self.voxel_generator = VoxelGenerator(
-                vsize_xyz=self.voxel_size,
-                coors_range_xyz=self.lidar_range,
-                max_num_points_per_voxel=self.max_points_per_voxel,
-                num_point_features=4,
-                max_num_voxels=self.max_voxels
-            )
+            self.voxel_generator = VoxelGenerator(vsize_xyz=self.voxel_size, coors_range_xyz=self.lidar_range,
+                                                  max_num_points_per_voxel=self.max_points_per_voxel,
+                                                  num_point_features=4, max_num_voxels=self.max_voxels)
 
     def preprocess(self, pcd_np):
         data_dict = {}
@@ -67,8 +57,7 @@ class SpVoxelPreprocessor(BasePreprocessor):
             voxel_output = self.voxel_generator.point_to_voxel(pcd_tv)
         if isinstance(voxel_output, dict):
             voxels, coordinates, num_points = \
-                voxel_output['voxels'], voxel_output['coordinates'], \
-                voxel_output['num_points_per_voxel']
+                voxel_output['voxels'], voxel_output['coordinates'], voxel_output['num_points_per_voxel']
         else:
             voxels, coordinates, num_points = voxel_output
 
@@ -128,9 +117,7 @@ class SpVoxelPreprocessor(BasePreprocessor):
             voxel_features.append(batch[i]['voxel_features'])
             voxel_num_points.append(batch[i]['voxel_num_points'])
             coords = batch[i]['voxel_coords']
-            voxel_coords.append(
-                np.pad(coords, ((0, 0), (1, 0)),
-                       mode='constant', constant_values=i))
+            voxel_coords.append(np.pad(coords, ((0, 0), (1, 0)), mode='constant', constant_values=i))
 
         voxel_num_points = torch.from_numpy(np.concatenate(voxel_num_points))
         voxel_features = torch.from_numpy(np.concatenate(voxel_features))
@@ -155,17 +142,13 @@ class SpVoxelPreprocessor(BasePreprocessor):
         processed_batch : dict
             Updated lidar batch.
         """
-        voxel_features = \
-            torch.from_numpy(np.concatenate(batch['voxel_features']))
-        voxel_num_points = \
-            torch.from_numpy(np.concatenate(batch['voxel_num_points']))
+        voxel_features = torch.from_numpy(np.concatenate(batch['voxel_features']))
+        voxel_num_points = torch.from_numpy(np.concatenate(batch['voxel_num_points']))
         coords = batch['voxel_coords']
         voxel_coords = []
 
         for i in range(len(coords)):
-            voxel_coords.append(
-                np.pad(coords[i], ((0, 0), (1, 0)),
-                       mode='constant', constant_values=i))
+            voxel_coords.append(np.pad(coords[i], ((0, 0), (1, 0)), mode='constant', constant_values=i))
         voxel_coords = torch.from_numpy(np.concatenate(voxel_coords))
 
         return {'voxel_features': voxel_features,

@@ -4,10 +4,12 @@
 
 import math
 from collections import OrderedDict
+from typing import Type, TypeVar
 
 import numpy as np
 import torch
 
+from opencood.data_utils.datasets.basedataset.base_dataset import BaseDataset
 from opencood.utils import box_utils
 from opencood.utils.common_utils import merge_features_to_dict
 from opencood.utils.pcd_utils import \
@@ -15,8 +17,10 @@ from opencood.utils.pcd_utils import \
     downsample_lidar_minimum
 from opencood.utils.transformation_utils import x1_to_x2
 
+T = TypeVar('T', bound=BaseDataset)
 
-def getEarlyFusionDataset(cls):
+
+def getEarlyFusionDataset(cls: Type[T]) -> Type[T]:
     class EarlyFusionDataset(cls):
         """
         This dataset is used for early fusion, where each CAV transmit the raw
@@ -24,9 +28,9 @@ def getEarlyFusionDataset(cls):
         """
 
         def __init__(self, params, visualize, train=True):
-            super(EarlyFusionDataset, self).__init__(params, visualize, train)
+            super().__init__(params, visualize, train)
             self.supervise_single = True if (
-                        'supervise_single' in params['model']['args'] and params['model']['args']['supervise_single']) \
+                    'supervise_single' in params['model']['args'] and params['model']['args']['supervise_single']) \
                 else False
             assert self.supervise_single is False
             self.proj_first = False if 'proj_first' not in params['fusion']['args'] \

@@ -37,20 +37,23 @@ def main():
     hypes = yaml_utils.load_yaml(opt.hypes_yaml, opt)
 
     logger.success('Dataset Building')
-    opencood_train_dataset = build_dataset(hypes, visualize=False, train=True)
-    opencood_validate_dataset = build_dataset(hypes, visualize=False, train=False)
-    logger.success(f'训练数据集类型: {type(opencood_train_dataset)}')
-    logger.success(f'验证数据集类型: {type(opencood_validate_dataset)}')
+    # train_dataset = build_dataset(hypes, visualize=False, train=True)
+    # validate_dataset = build_dataset(hypes, visualize=False, train=False)
 
-    train_loader = DataLoader(opencood_train_dataset, batch_size=hypes['train_params']['batch_size'],
-                              num_workers=4, collate_fn=opencood_train_dataset.collate_batch_train,
+    train_dataset = build_dataset(hypes['fusion']['core_method'], hypes['fusion']['dataset'], hypes, False, True)
+    validate_dataset = build_dataset(hypes['fusion']['core_method'], hypes['fusion']['dataset'], hypes, False, False)
+
+    logger.success(f'训练数据集类型: {type(train_dataset)}')
+    logger.success(f'验证数据集类型: {type(validate_dataset)}')
+
+    train_loader = DataLoader(train_dataset, batch_size=hypes['train_params']['batch_size'],
+                              num_workers=4, collate_fn=train_dataset.collate_batch_train,
                               shuffle=True, pin_memory=True, drop_last=True, prefetch_factor=2)
 
-    val_loader = DataLoader(opencood_validate_dataset, batch_size=hypes['train_params']['batch_size'],
-                            num_workers=4, collate_fn=opencood_train_dataset.collate_batch_train,
+    val_loader = DataLoader(validate_dataset, batch_size=hypes['train_params']['batch_size'],
+                            num_workers=4, collate_fn=train_dataset.collate_batch_train,
                             shuffle=True, pin_memory=True, drop_last=True, prefetch_factor=2)
-    logger.success('---数据集加载完毕---')
-    logger.success('Creating Model')
+    logger.success('数据集加载完毕, 开始创建模型')
 
     model = train_utils.create_model(hypes['model']['core_method'], hypes['model']['args'])
 
@@ -101,8 +104,8 @@ def main():
     epoch_times = []
     total_start_time = datetime.now()
     epoches = hypes['train_params']['epoches']
-    supervise_single_flag = False if not hasattr(opencood_train_dataset, "supervise_single") \
-        else opencood_train_dataset.supervise_single
+    supervise_single_flag = False if not hasattr(train_dataset, "supervise_single") \
+        else train_dataset.supervise_single
 
     # used to help schedule learning rate
     epoches = max(epoches, init_epoch)
@@ -195,7 +198,7 @@ def main():
         logger.success(f'Epoch {epoch}, Total Time (train + validation): {during_time:.2f} seconds')
         # scheduler.step(epoch)
         logger.success(f'Dataset Building for {epoch + 1}')
-        opencood_train_dataset.reinitialize()
+        train_dataset.reinitialize()
 
     logger.success(f'Training Finished, checkpoints saved to {saved_path}')
     logger.success(f'Total train time: {(datetime.now() - total_start_time).total_seconds():.2f} seconds')

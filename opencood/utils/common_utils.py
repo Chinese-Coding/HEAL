@@ -15,7 +15,7 @@ import pickle
 from collections import OrderedDict
 
 def update_dict(d1,d2):
-    '''
+    """
     credit: https://github.com/yutu-75/update_dict/blob/main/update_dict/update_dict.py
 
     :param d1: Default nested dictionary,默认嵌套字典;
@@ -33,7 +33,7 @@ def update_dict(d1,d2):
     {'a': {'b': {'c': {'d': 'www'}}}, 'e': {'e1': {'e5': 'qwq'}}, 'e5': {}, 'ss': '1111'}
     # >>> update_dict({'a': {'c': 1, 'd': {}}, 'b': 4}, {'a': 2})
     {'a': 2, 'b': 4}
-    '''
+    """
 
     if not isinstance(d1, dict) or not isinstance(d2, dict):
         raise TypeError('Params of update_dict should be dicts')

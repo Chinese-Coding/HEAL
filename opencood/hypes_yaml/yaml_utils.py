@@ -4,7 +4,7 @@
 
 
 import re
-from typing import Union
+from typing import Union, Mapping, Dict
 
 import yaml
 import os
@@ -30,6 +30,7 @@ def load_yaml(file: Union[str, None], opt=None):
         A dictionary that contains defined parameters.
     """
     if opt and opt.model_dir:
+        # TODO: 如果从 `model_dir` 文件加载时就是从 `config.yaml` 中加载, 所以一定要注意命名问题.
         file = os.path.join(opt.model_dir, 'config.yaml')
 
     stream = open(file, 'r')
@@ -46,6 +47,7 @@ def load_yaml(file: Union[str, None], opt=None):
         list(u'-+0123456789.'))
     param = yaml.load(stream, Loader=loader)
     if "yaml_parser" in param:
+        # TODO：又是这种使用 `eval` 函数的写法
         param = eval(param["yaml_parser"])(param)
 
     return param
@@ -338,7 +340,7 @@ def load_lift_splat_shoot_params(param):
     return param
 
 
-def load_general_params(param):
+def load_general_params(param: Mapping) -> Dict:
     """
     Based on the lidar range and resolution of voxel, calcuate the anchor box
     and target resolution.

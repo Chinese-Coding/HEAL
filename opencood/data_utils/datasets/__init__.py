@@ -1,17 +1,19 @@
-from opencood.data_utils.datasets.late_fusion_dataset import getLateFusionDataset
-from opencood.data_utils.datasets.late_heter_fusion_dataset import getLateheterFusionDataset
-from opencood.data_utils.datasets.early_fusion_dataset import getEarlyFusionDataset
-from opencood.data_utils.datasets.intermediate_fusion_dataset import getIntermediateFusionDataset
-from opencood.data_utils.datasets.intermediate_2stage_fusion_dataset import getIntermediate2stageFusionDataset
-from opencood.data_utils.datasets.intermediate_heter_fusion_dataset import getIntermediateheterFusionDataset
+from collections.abc import Mapping
 
+from opencood.data_utils.datasets.basedataset.base_dataset import BaseDataset
+from opencood.data_utils.datasets.basedataset.dairv2x_basedataset import DAIRV2XBaseDataset
+from opencood.data_utils.datasets.basedataset.opv2v_basedataset import OPV2VBaseDataset
+from opencood.data_utils.datasets.basedataset.v2xset_basedataset import V2XSETBaseDataset
+from opencood.data_utils.datasets.basedataset.v2xsim_basedataset import V2XSIMBaseDataset
+from opencood.data_utils.datasets.early_fusion_dataset import getEarlyFusionDataset
 from opencood.data_utils.datasets.heter_infer.intermediate_heter_infer_fusion_dataset import \
     getIntermediateheterinferFusionDataset
-
-from opencood.data_utils.datasets.basedataset.opv2v_basedataset import OPV2VBaseDataset
-from opencood.data_utils.datasets.basedataset.v2xsim_basedataset import V2XSIMBaseDataset
-from opencood.data_utils.datasets.basedataset.dairv2x_basedataset import DAIRV2XBaseDataset
-from opencood.data_utils.datasets.basedataset.v2xset_basedataset import V2XSETBaseDataset
+from opencood.data_utils.datasets.intermediate_2stage_fusion_dataset import getIntermediate2stageFusionDataset
+from opencood.data_utils.datasets.intermediate_fusion_dataset import getIntermediateFusionDataset
+from opencood.data_utils.datasets.intermediate_heter_fusion_dataset import getIntermediateheterFusionDataset
+from opencood.data_utils.datasets.late_fusion_dataset import getLateFusionDataset
+from opencood.data_utils.datasets.late_heter_fusion_dataset import getLateheterFusionDataset
+from opencood.logger import get_logger
 
 
 def build_dataset(dataset_cfg, visualize=False, train=True):
@@ -34,3 +36,40 @@ def build_dataset(dataset_cfg, visualize=False, train=True):
     )
 
     return dataset
+
+
+available_fusion_dataset = {
+    'early': getEarlyFusionDataset,
+    'intermediateheterinfer': getIntermediateheterinferFusionDataset,
+    'intermediate2stage': getIntermediate2stageFusionDataset,
+    'intermediate': getIntermediateFusionDataset,
+    'intermediateheter': getIntermediateheterFusionDataset,
+    'late': getLateFusionDataset, 'lateheter': getLateheterFusionDataset
+}
+
+available_base_dataset = {
+    'dairv2x': DAIRV2XBaseDataset, 'opv2v': OPV2VBaseDataset,
+    'v2xset': V2XSETBaseDataset, 'v2xsim': V2XSIMBaseDataset
+}
+
+logger = get_logger()
+
+
+def build_dataset(fusion_name: str, dataset_name: str, dataset_cfg: Mapping, visualize=False, train=True):
+    try:
+        fusion_dataset = available_fusion_dataset[fusion_name]
+    except KeyError:
+        logger.error(f'Fusion name {fusion_name} is not available. Please choose from {available_fusion_dataset}')
+        exit(-1)
+
+    try:
+        base_dataset = available_base_dataset[dataset_name]
+    except KeyError:
+        logger.error(f'Dataset name {dataset_name} is not available. Please choose from {available_base_dataset}')
+        exit(-1)
+
+    return fusion_dataset(base_dataset)(
+        params=dataset_cfg,
+        visualize=visualize,
+        train=train
+    )

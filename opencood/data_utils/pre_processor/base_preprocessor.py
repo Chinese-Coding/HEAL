@@ -7,7 +7,7 @@ import numpy as np
 from opencood.utils import pcd_utils
 
 
-class BasePreprocessor(object):
+class BasePreprocessor:
     """
     Basic Lidar pre-processor.
 
@@ -72,8 +72,7 @@ class BasePreprocessor(object):
         # (N, 3)
         indices = ((points[:, :3] - bev_origin) / ratio).astype(int)
         mask = np.logical_and(indices[:, 0] > 0, indices[:, 0] < img_row)
-        mask = np.logical_and(mask, np.logical_and(indices[:, 1] > 0,
-                                                   indices[:, 1] < img_col))
+        mask = np.logical_and(mask, np.logical_and(indices[:, 1] > 0, indices[:, 1] < img_col))
         indices = indices[mask, :]
         bev_map[indices[:, 0], indices[:, 1]] = 1
         return bev_map

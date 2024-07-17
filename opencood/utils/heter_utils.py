@@ -10,6 +10,7 @@ from collections import OrderedDict
 import json
 
 
+# adaptor 转接器
 class Adaptor:
     def __init__(self, ego_modality, model_modality_list, modality_assignment, lidar_channels_dict, mapping_dict,
                  cav_preference, train):
@@ -23,7 +24,7 @@ class Adaptor:
         self.cav_preferece = cav_preference  # training, probability for setting non-ego cav modality
         self.train = train
 
-    def reorder_cav_list(self, cav_list, scenario_name):
+    def reorder_cav_list(self, cav_list: list, scenario_name: str):
         """
         When evaluation, make the cav that could be ego modality after mapping be the first.
 

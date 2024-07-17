@@ -59,9 +59,8 @@ class HeterPyramidCollab(nn.Module):
                 encoder_class = encoders[model_setting['core_method']]
             except KeyError:
                 available_encoders = ', '.join(encoders.keys())
-                logger.error(
-                    f'不受支持的 encoder. 选择的 encoder 为: {model_setting["core_method"]}.'
-                    f'可用的 encoders: {available_encoders}')
+                logger.error(f'不受支持的 encoder. 选择的 encoder 为: {model_setting["core_method"]}.'
+                             f'可用的 encoders: {available_encoders}')
                 exit(-1)
 
             """Encoder building"""
@@ -156,6 +155,7 @@ class HeterPyramidCollab(nn.Module):
         affine_matrix = normalize_pairwise_tfm(data_dict['pairwise_t_matrix'], self.H, self.W, self.fake_voxel_size)
         record_len = data_dict['record_len']
         # print(agent_modality_list)
+        # 统计每个模态出现的次数 TODO: 但是为什么要这么做呢? 为什么不用集合呢? 为在下文中并没有看到需要用到其次数的地方?
         modality_count_dict = Counter(agent_modality_list)
         modality_feature_dict = {}
 
@@ -196,6 +196,7 @@ class HeterPyramidCollab(nn.Module):
 
                 crop_func = torchvision.transforms.CenterCrop((target_H, target_W))
                 modality_feature_dict[modality_name] = crop_func(feature)
+                # TODO: depth supervision 含义是什么呢？ 为什么单独对使用 camera 的特征启用呢
                 if eval(f"self.depth_supervision_{modality_name}"):
                     output_dict.update({
                         f"depth_items_{modality_name}": eval(f"self.encoder_{modality_name}").depth_items

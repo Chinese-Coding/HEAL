@@ -8,7 +8,7 @@ import os
 import re
 import shutil
 from datetime import datetime
-from typing import overload, AnyStr, Mapping
+from typing import AnyStr, Mapping
 
 import torch
 import torch.optim as optim
@@ -124,7 +124,7 @@ def load_saved_model(saved_path: str, model):
     return initial_epoch, model
 
 
-def setup_train(hypes: dict):
+def setup_train(hypes: Mapping) -> str:
     """
     Create folder for saved model based on current timestep and model name
 
@@ -156,19 +156,6 @@ def setup_train(hypes: dict):
             yaml.dump(hypes, outfile)
 
     return full_path
-
-
-@overload
-def create_model(backbone_name: AnyStr, backbone_config: Mapping) -> nn.Module:
-    try:
-        model = backbones[backbone_name]
-    except KeyError:
-        logger.error(f'backbone not found in models folder. '
-                     f'Please make sure you have a python file named {backbone_name} '
-                     f'and has a class called target_model_name ignoring upper/lower case')
-        exit(0)
-    instance = model(backbone_config)
-    return instance
 
 
 def create_model(hypes: Mapping) -> nn.Module:
@@ -207,16 +194,28 @@ def create_model(hypes: Mapping) -> nn.Module:
     return instance
 
 
-def create_loss(loss_func_name, loss_func_config):
+def create_model(backbone_name: str, backbone_config: Mapping) -> nn.Module:
+    try:
+        model = backbones[backbone_name]
+    except KeyError:
+        logger.error(f'backbone not found in models folder. '
+                     f'Please make sure you have a python file named {backbone_name} '
+                     f'and has a class called target_model_name ignoring upper/lower case')
+        exit(0)
+    instance = model(backbone_config)
+    return instance
+
+
+def create_loss(loss_func_name: AnyStr, loss_func_config: Mapping):
     try:
         loss_func = losses[loss_func_name]
     except KeyError:
-        logger.error(f'backbone not found in models folder. '
-                     f'Please make sure you have a python file named {loss_func_name} '
-                     f'and has a class called target_model_name ignoring upper/lower case')
+        logger.error(f'loss function not found in models folder. '
+                     f'Please make sure you have a loss function named {loss_func_name} in loss folder')
         exit(0)
     criterion = loss_func(loss_func_config)
     return criterion
+
 
 def create_loss(hypes):
     """

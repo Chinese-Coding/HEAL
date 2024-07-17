@@ -5,6 +5,7 @@
 """
 Transformation utils
 """
+from collections.abc import Mapping
 
 import numpy as np
 import torch
@@ -19,9 +20,11 @@ def regroup(x, record_len):
     return split_x
 
 
-def get_pairwise_transformation(base_data_dict, max_cav, proj_first):
+def get_pairwise_transformation(base_data_dict: Mapping, max_cav: int, proj_first: bool):
     """
     Get pair-wise transformation matrix accross different agents.
+    用于计算不同车辆（cav，cooperative autonomous vehicles）之间的成对变换矩阵
+    这个函数的目的是在多车辆场景中计算车辆之间的成对变换矩阵，以便在融合激光雷达数据时能够将不同车辆的激光雷达数据转换到相同的坐标系中。
 
     Parameters
     ----------
@@ -38,19 +41,18 @@ def get_pairwise_transformation(base_data_dict, max_cav, proj_first):
         shape: (L, L, 4, 4), L is the max cav number in a scene
         pairwise_t_matrix[i, j] is Tji, i_to_j
     """
+    # `np.eye()` 生成单位矩阵
     pairwise_t_matrix = np.tile(np.eye(4), (max_cav, max_cav, 1, 1))  # (L, L, 4, 4)
 
-    if proj_first:
-        # if lidar projected to ego first, then the pairwise matrix
-        # becomes identity
-        # no need to warp again in fusion time.
-
+    if proj_first:  # 如果 proj_first 为真，则表示激光雷达数据已经投影到 ego 上，因此无需再进行任何变换，直接返回单位矩阵。
+        # if lidar projected to ego first, then the pairwise matrix becomes identity no need to warp again in fusion time.
         # pairwise_t_matrix[:, :] = np.identity(4)
         return pairwise_t_matrix
     else:
         t_list = []
 
         # save all transformation matrix in a list in order first.
+        # 从 base_data_dict 中提取每个 cav 的激光雷达位姿, 并转换为全局坐标系下的变换矩阵
         for cav_id, cav_content in base_data_dict.items():
             lidar_pose = cav_content['params']['lidar_pose']
             t_list.append(x_to_world(lidar_pose))  # Twx
@@ -260,7 +262,7 @@ def tfm_to_pose_torch(tfm: torch.Tensor, dof: int):
     elif dof == 3:
         pose = torch.stack([x, y, yaw]).T
     else:
-        raise ("Only support returning 3dof/6dof pose.")
+        raise "Only support returning 3dof/6dof pose."
 
     return pose
 

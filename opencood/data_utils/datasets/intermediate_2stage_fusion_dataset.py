@@ -5,10 +5,12 @@
 import copy
 import math
 from collections import OrderedDict
+from typing import Type, TypeVar
 
 import numpy as np
 import torch
 
+from opencood.data_utils.datasets.basedataset.base_dataset import BaseDataset
 from opencood.utils import box_utils as box_utils
 from opencood.utils.camera_utils import (
     sample_augmentation,
@@ -25,8 +27,10 @@ from opencood.utils.pcd_utils import (
 from opencood.utils.pose_utils import add_noise_data_dict
 from opencood.utils.transformation_utils import x1_to_x2, get_pairwise_transformation
 
+T = TypeVar('T', bound=BaseDataset)
 
-def getIntermediate2stageFusionDataset(cls):
+
+def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
     """
     cls: the Basedataset.
     """

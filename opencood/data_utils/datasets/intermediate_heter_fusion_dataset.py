@@ -13,6 +13,7 @@ instead of using the cooperative label.
 import copy
 import math
 from collections import OrderedDict
+from typing import Mapping
 
 import numpy as np
 import torch
@@ -43,12 +44,11 @@ def getIntermediateheterFusionDataset(cls):
     """
 
     class IntermediateheterFusionDataset(cls):
-        def __init__(self, params, visualize, train=True):
+        def __init__(self, params: Mapping, visualize: bool, train=True):
             super().__init__(params, visualize, train)
             # intermediate and supervise single
-            self.supervise_single = True if (
-                    'supervise_single' in params['model']['args'] and params['model']['args']['supervise_single']) \
-                else False
+            self.supervise_single = True if \
+                'supervise_single' in params['model']['args'] and params['model']['args']['supervise_single'] else False
             self.proj_first = False if 'proj_first' not in params['fusion']['args'] \
                 else params['fusion']['args']['proj_first']
 
@@ -56,10 +56,12 @@ def getIntermediateheterFusionDataset(cls):
             self.anchor_box_torch = torch.from_numpy(self.anchor_box)
 
             self.heterogeneous = True
+            # 某一场景下车辆 id 与 模态的对应关系
             self.modality_assignment = None if (
                     'assignment_path' not in params['heter'] or params['heter']['assignment_path'] is None) \
                 else read_json(params['heter']['assignment_path'])
 
+            # 自车的模态
             self.ego_modality = params['heter']['ego_modality']  # "m1" or "m1&m2" or "m3"
 
             self.modality_name_list = list(params['heter']['modality_setting'].keys())
@@ -77,12 +79,11 @@ def getIntermediateheterFusionDataset(cls):
                 if modal_setting['sensor_type'] == 'lidar':
                     setattr(self, f"pre_processor_{modality_name}",
                             build_preprocessor(modal_setting['preprocess'], train))
-
                 elif modal_setting['sensor_type'] == 'camera':
                     setattr(self, f"data_aug_conf_{modality_name}", modal_setting['data_aug_conf'])
 
                 else:
-                    raise ("Not support this type of sensor")
+                    raise "Not support this type of sensor"
 
             self.reinitialize()  # 该函数由父类 (cls) 实现
 
@@ -91,15 +92,14 @@ def getIntermediateheterFusionDataset(cls):
             self.box_align = False
             if "box_align" in params:
                 self.box_align = True
-                self.stage1_result_path = params['box_align']['train_result'] if train else params['box_align'][
-                    'val_result']
+                self.stage1_result_path = \
+                    params['box_align']['train_result'] if train else params['box_align']['val_result']
                 self.stage1_result = read_json(self.stage1_result_path)
                 self.box_align_args = params['box_align']['args']
 
-        def get_item_single_car(self, selected_cav_base, ego_cav_base):
+        def get_item_single_car(self, selected_cav_base: Mapping, ego_cav_base):
             """
             Process a single CAV's information for the train/test pipeline.
-
 
             Parameters
             ----------
@@ -120,12 +120,8 @@ def getIntermediateheterFusionDataset(cls):
             ego_pose, ego_pose_clean = ego_cav_base['params']['lidar_pose'], ego_cav_base['params']['lidar_pose_clean']
 
             # calculate the transformation matrix
-            transformation_matrix = \
-                x1_to_x2(selected_cav_base['params']['lidar_pose'],
-                         ego_pose)  # T_ego_cav
-            transformation_matrix_clean = \
-                x1_to_x2(selected_cav_base['params']['lidar_pose_clean'],
-                         ego_pose_clean)
+            transformation_matrix = x1_to_x2(selected_cav_base['params']['lidar_pose'], ego_pose)  # T_ego_cav
+            transformation_matrix_clean = x1_to_x2(selected_cav_base['params']['lidar_pose_clean'], ego_pose_clean)
 
             modality_name = selected_cav_base['modality_name']
             sensor_type = self.sensor_type_dict[modality_name]
@@ -163,16 +159,16 @@ def getIntermediateheterFusionDataset(cls):
                     selected_cav_processed.update({f'processed_features_{modality_name}': processed_lidar})
 
             # generate targets label single GT, note the reference pose is itself.
-            object_bbx_center, object_bbx_mask, object_ids = self.generate_object_center(
-                [selected_cav_base], selected_cav_base['params']['lidar_pose']
-            )
+            object_bbx_center, object_bbx_mask, object_ids = \
+                self.generate_object_center([selected_cav_base], selected_cav_base['params']['lidar_pose'])
             label_dict = self.post_processor.generate_label(
                 gt_box_center=object_bbx_center, anchors=self.anchor_box, mask=object_bbx_mask
             )
             selected_cav_processed.update({
                 "single_label_dict": label_dict,
                 "single_object_bbx_center": object_bbx_center,
-                "single_object_bbx_mask": object_bbx_mask})
+                "single_object_bbx_mask": object_bbx_mask
+            })
 
             # camera
             if sensor_type == "camera":
@@ -212,15 +208,8 @@ def getIntermediateheterFusionDataset(cls):
                         eval(f"self.data_aug_conf_{modality_name}"), self.train
                     )
                     img_src, post_rot2, post_tran2 = img_transform(
-                        img_src,
-                        post_rot,
-                        post_tran,
-                        resize=resize,
-                        resize_dims=resize_dims,
-                        crop=crop,
-                        flip=flip,
-                        rotate=rotate,
-                    )
+                        img_src, post_rot, post_tran, resize=resize, resize_dims=resize_dims,
+                        crop=crop, flip=flip, rotate=rotate)
                     # for convenience, make augmentation matrices 3x3
                     post_tran = torch.zeros(3)
                     post_rot = torch.eye(3)
@@ -260,8 +249,8 @@ def getIntermediateheterFusionDataset(cls):
             selected_cav_processed.update({"anchor_box": self.anchor_box})
 
             # note the reference pose ego
-            object_bbx_center, object_bbx_mask, object_ids = self.generate_object_center([selected_cav_base],
-                                                                                         ego_pose_clean)
+            object_bbx_center, object_bbx_mask, object_ids = \
+                self.generate_object_center([selected_cav_base], ego_pose_clean)
 
             selected_cav_processed.update(
                 {
@@ -282,20 +271,20 @@ def getIntermediateheterFusionDataset(cls):
             processed_data_dict = OrderedDict()
             processed_data_dict['ego'] = {}
 
+            """
+            # first find the ego vehicle's lidar pose
+            从 base_data_dict 里面找到对应的 ego 车辆, 并对变量进行一些赋值, 同时检查值的合法性
+            """
             ego_id = -1
             ego_lidar_pose = []
             ego_cav_base = None
-
-            # first find the ego vehicle's lidar pose
             for cav_id, cav_content in base_data_dict.items():
                 if cav_content['ego']:
                     ego_id = cav_id
                     ego_lidar_pose = cav_content['params']['lidar_pose']
                     ego_cav_base = cav_content
                     break
-
-            assert cav_id == list(base_data_dict.keys())[
-                0], "The first element in the OrderedDict must be ego"
+            assert cav_id == list(base_data_dict.keys())[0], "The first element in the OrderedDict must be ego"
             assert ego_id != -1
             assert len(ego_lidar_pose) > 0
 
@@ -323,6 +312,7 @@ def getIntermediateheterFusionDataset(cls):
             cav_id_list = []
             projected_lidar_clean_list = []  # disconet
 
+            # TODO：和可视化有关的部分, 也许可以先不用看?
             if self.visualize or self.kd_flag:
                 projected_lidar_stack = []
                 # input_list_m1_proj = []  # 2023.8.31 to correct discretization errors with kd flag
@@ -337,11 +327,12 @@ def getIntermediateheterFusionDataset(cls):
                 }
 
             # loop over all CAVs to process information
+            # 过滤掉不在通信范围内的, 没有指定模态的
             for cav_id, selected_cav_base in base_data_dict.items():
                 # check if the cav is within the communication range with ego
-                distance = math.sqrt((selected_cav_base['params']['lidar_pose'][0] -
-                                      ego_lidar_pose[0]) ** 2 + (
-                                             selected_cav_base['params']['lidar_pose'][1] - ego_lidar_pose[1]) ** 2)
+                # 简单的勾股定理
+                distance = math.sqrt((selected_cav_base['params']['lidar_pose'][0] - ego_lidar_pose[0]) ** 2 +
+                                     (selected_cav_base['params']['lidar_pose'][1] - ego_lidar_pose[1]) ** 2)
 
                 # if distance is too far, we will just skip this agent
                 if distance > self.params['comm_range']:
@@ -395,7 +386,7 @@ def getIntermediateheterFusionDataset(cls):
                         for i, cav_id in enumerate(cav_id_list):
                             lidar_pose_list[i] = cur_agnet_pose[i].tolist()
                             base_data_dict[cav_id]['params']['lidar_pose'] = cur_agnet_pose[i].tolist()
-
+            # 坐标转换矩阵, 两两之间各有一个
             pairwise_t_matrix = get_pairwise_transformation(base_data_dict, self.max_cav, self.proj_first)
 
             lidar_poses = np.array(lidar_pose_list).reshape(-1, 6)  # [N_cav, 6]
@@ -416,9 +407,7 @@ def getIntermediateheterFusionDataset(cls):
                 else:
                     self.generate_object_center = self.generate_object_center_lidar
 
-                selected_cav_processed = self.get_item_single_car(
-                    selected_cav_base,
-                    ego_cav_base)
+                selected_cav_processed = self.get_item_single_car(selected_cav_base, ego_cav_base)
 
                 object_stack.append(selected_cav_processed['object_bbx_center'])
                 object_id_stack += selected_cav_processed['object_ids']
@@ -706,8 +695,7 @@ def getIntermediateheterFusionDataset(cls):
                                        'anchor_box': self.anchor_box_torch})
 
             if self.visualize:
-                origin_lidar = \
-                    np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar))
+                origin_lidar = np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar))
                 origin_lidar = torch.from_numpy(origin_lidar)
                 output_dict['ego'].update({'origin_lidar': origin_lidar})
 
@@ -760,10 +748,8 @@ def getIntermediateheterFusionDataset(cls):
             transformation_matrix_clean_torch = \
                 torch.from_numpy(np.identity(4)).float()
 
-            output_dict['ego'].update({'transformation_matrix':
-                                           transformation_matrix_torch,
-                                       'transformation_matrix_clean':
-                                           transformation_matrix_clean_torch, })
+            output_dict['ego'].update({'transformation_matrix': transformation_matrix_torch,
+                                       'transformation_matrix_clean': transformation_matrix_clean_torch})
 
             output_dict['ego'].update({
                 "sample_idx": batch[0]['ego']['sample_idx'],

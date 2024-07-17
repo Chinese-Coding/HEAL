@@ -5,21 +5,21 @@
 """
 Anchor-free 2d Generator
 """
+from typing import Mapping
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
 from opencood.utils.transformation_utils import dist_to_continuous
-from opencood.data_utils.post_processor.base_postprocessor \
-    import BasePostprocessor
+from opencood.data_utils.post_processor.base_postprocessor import BasePostprocessor
 from opencood.utils import box_utils
 from opencood.visualization import vis_utils
 
 
 class BevPostprocessor(BasePostprocessor):
-    def __init__(self, anchor_params, train):
-        super(BevPostprocessor, self).__init__(anchor_params, train)
+    def __init__(self, anchor_params: Mapping, train: bool):
+        super().__init__(anchor_params, train)
         # self.geometry_param = anchor_params["geometry"]
         self.geometry_param = anchor_params["geometry_param"]
 
@@ -45,8 +45,7 @@ class BevPostprocessor(BasePostprocessor):
         label_dict : dict
             Dictionary that contains all target related info.
         """
-        assert self.params['order'] == 'lwh', \
-            'Currently BEV only support lwh bbx order.'
+        assert self.params['order'] == 'lwh', 'Currently BEV only support lwh bbx order.'
         # (max_num, 7)
         gt_box_center = kwargs['gt_box_center']
 
@@ -56,8 +55,7 @@ class BevPostprocessor(BasePostprocessor):
         # (n, 7)
         gt_box_center_valid = gt_box_center[masks == 1]
         # (n, 4, 3)
-        bev_corners = box_utils.boxes_to_corners2d(gt_box_center_valid,
-                                                   self.params['order'])
+        bev_corners = box_utils.boxes_to_corners2d(gt_box_center_valid, self.params['order'])
 
         n = gt_box_center_valid.shape[0]
         # (n, 4, 2)
@@ -100,21 +98,19 @@ class BevPostprocessor(BasePostprocessor):
         res = self.geometry_param["res"]
         downsample_rate = self.geometry_param["downsample_rate"]
 
-        bev_origin = np.array([self.geometry_param["L1"],
-                               self.geometry_param["W1"]]).reshape(1, -1)
+        bev_origin = np.array([self.geometry_param["L1"], self.geometry_param["W1"]]).reshape(1, -1)
 
         # discretized bbx corner representations -- (n, 4, 2)
         # bev_corners is real coordinate
         # bev_corners_dist is pixel coordinate
         bev_corners_dist = (bev_corners - bev_origin) / res / downsample_rate
         # generate the coordinates of m
-        x = np.arange(self.geometry_param["label_shape"][0]) # H (x in lidar coordinate)
-        y = np.arange(self.geometry_param["label_shape"][1]) # W (y in lidar coordinate)
+        x = np.arange(self.geometry_param["label_shape"][0])  # H (x in lidar coordinate)
+        y = np.arange(self.geometry_param["label_shape"][1])  # W (y in lidar coordinate)
         xx, yy = np.meshgrid(x, y)
 
         # (label_shape[0]*label_shape[1], 2)
-        points = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)],
-                                axis=-1) # pixel 
+        points = np.concatenate([xx.reshape(-1, 1), yy.reshape(-1, 1)], axis=-1)  # pixel
         bev_origin_dist = bev_origin / res / downsample_rate
 
         # loop over each bbx, find the points within the bbx.
@@ -122,26 +118,17 @@ class BevPostprocessor(BasePostprocessor):
             reg_target = reg_targets[i, :]
 
             # find discredited points in bbx
-            points_in_box = \
-                box_utils.get_points_in_rotated_box(points,
-                                                    bev_corners_dist[i, ...])
+            points_in_box = box_utils.get_points_in_rotated_box(points, bev_corners_dist[i, ...])
             # convert points to continuous space
-            points_continuous = dist_to_continuous(points_in_box,
-                                                   bev_origin_dist,
-                                                   res,
-                                                   downsample_rate)
-            actual_reg_target = np.repeat(reg_target.reshape(1, -1),
-                                          points_continuous.shape[0],
-                                          axis=0)
+            points_continuous = dist_to_continuous(points_in_box, bev_origin_dist, res, downsample_rate)
+            actual_reg_target = np.repeat(reg_target.reshape(1, -1), points_continuous.shape[0], axis=0)
             # build learning targets
-            actual_reg_target[:, 2:4] = \
-                actual_reg_target[:, 2:4] - points_continuous
+            actual_reg_target[:, 2:4] = actual_reg_target[:, 2:4] - points_continuous
             actual_reg_target[:, 4:] = np.log(actual_reg_target[:, 4:])
 
             # update label map
             label_map[points_in_box[:, 0], points_in_box[:, 1], 0] = 1.0
-            label_map[points_in_box[:, 0], points_in_box[:, 1], 1:] = \
-                actual_reg_target
+            label_map[points_in_box[:, 0], points_in_box[:, 1], 1:] = actual_reg_target
 
     def normalize_targets(self, label_map):
         """
@@ -159,8 +146,7 @@ class BevPostprocessor(BasePostprocessor):
             Nromalized label_map.
 
         """
-        label_map[..., 1:] = \
-            (label_map[..., 1:] - self.target_mean) / self.target_std_dev
+        label_map[..., 1:] = (label_map[..., 1:] - self.target_mean) / self.target_std_dev
         return label_map
 
     def denormalize_reg_map(self, reg_map):
@@ -184,10 +170,8 @@ class BevPostprocessor(BasePostprocessor):
             target_std_dev = self.target_std_dev
 
         else:
-            target_mean = \
-                torch.from_numpy(self.target_mean).to(reg_map.device)
-            target_std_dev = \
-                torch.from_numpy(self.target_std_dev).to(reg_map.device)
+            target_mean = torch.from_numpy(self.target_mean).to(reg_map.device)
+            target_std_dev = torch.from_numpy(self.target_std_dev).to(reg_map.device)
         reg_map = reg_map * target_std_dev + target_mean
         return reg_map
 
@@ -207,14 +191,11 @@ class BevPostprocessor(BasePostprocessor):
         processed_batch : dict
             Reformatted labels in torch tensor.
         """
-        label_map_list = [x["label_map"][np.newaxis, ...] for x in
-                          label_batch_list]
+        label_map_list = [x["label_map"][np.newaxis, ...] for x in label_batch_list]
         processed_batch = {
             # (batch_size, 7, label_shape[0], label_shape[1])
-            "label_map": torch.from_numpy(np.concatenate(label_map_list,
-                                                         axis=0)),
-            "bev_corners": [torch.from_numpy(x["bev_corners"]) for x in
-                            label_batch_list]
+            "label_map": torch.from_numpy(np.concatenate(label_map_list, axis=0)),
+            "bev_corners": [torch.from_numpy(x["bev_corners"]) for x in label_batch_list]
         }
         return processed_batch
 
@@ -269,9 +250,7 @@ class BevPostprocessor(BasePostprocessor):
                 box3d = F.pad(corners2d, (0, 1))
                 # (number of high confidence bbx, 4, 2)
                 projected_boxes2d = \
-                    box_utils.project_points_by_matrix_torch(box3d.view(-1, 3),
-                                                             transformation_matrix)[
-                    :, :2]
+                    box_utils.project_points_by_matrix_torch(box3d.view(-1, 3), transformation_matrix)[:, :2]
 
                 projected_boxes2d = projected_boxes2d.view(-1, 4, 2)
                 scores = prob[mask]
@@ -284,8 +263,7 @@ class BevPostprocessor(BasePostprocessor):
         else:
             return None, None
 
-        keep_index = box_utils.nms_rotated(pred_box2ds, pred_scores,
-                                           self.params['nms_thresh'])
+        keep_index = box_utils.nms_rotated(pred_box2ds, pred_scores, self.params['nms_thresh'])
         if len(keep_index):
             pred_box2ds = pred_box2ds[keep_index]
             pred_scores = pred_scores[keep_index]
@@ -316,25 +294,18 @@ class BevPostprocessor(BasePostprocessor):
 
         """
 
-        assert len(reg_map.shape) == 3, \
-            "only support shape of label_shape i.e. (*, *, 6)"
+        assert len(reg_map.shape) == 3, "only support shape of label_shape i.e. (*, *, 6)"
         device = reg_map.device
 
-        cos_t, sin_t, x, y, log_dx, log_dy = \
-            [tt.squeeze(-1) for tt in torch.chunk(reg_map, 6, dim=-1)]
+        cos_t, sin_t, x, y, log_dx, log_dy = [tt.squeeze(-1) for tt in torch.chunk(reg_map, 6, dim=-1)]
         yaw = torch.atan2(sin_t, cos_t)
         dx, dy = log_dx.exp(), log_dy.exp()
 
-        grid_size = self.geometry_param["res"] * \
-                    self.geometry_param["downsample_rate"]
-        grid_x = torch.arange(self.geometry_param["L1"],
-                              self.geometry_param["L2"],
+        grid_size = self.geometry_param["res"] * self.geometry_param["downsample_rate"]
+        grid_x = torch.arange(self.geometry_param["L1"], self.geometry_param["L2"],
                               grid_size, dtype=torch.float32, device=device)
-        grid_y = torch.arange(self.geometry_param["W1"],
-                              self.geometry_param["W2"],
-                              grid_size,
-                              dtype=torch.float32,
-                              device=device)
+        grid_y = torch.arange(self.geometry_param["W1"], self.geometry_param["W2"],
+                              grid_size, dtype=torch.float32, device=device)
 
         xx, yy = torch.meshgrid([grid_x, grid_y])
         center_x = xx + x
@@ -396,8 +367,7 @@ class BevPostprocessor(BasePostprocessor):
 
             # (number of high confidence bbx, 4, 2)
             projected_boxes2d = \
-                box_utils.project_points_by_matrix_torch(box3d.view(-1, 3),
-                                                         transformation_matrix)[:, :2]
+                box_utils.project_points_by_matrix_torch(box3d.view(-1, 3), transformation_matrix)[:, :2]
             projected_boxes2d = projected_boxes2d.view(-1, 4, 2)
             scores = prob[mask]
             pred_box2d_list.append(projected_boxes2d)
@@ -406,9 +376,7 @@ class BevPostprocessor(BasePostprocessor):
         pred_box2ds = torch.cat(pred_box2d_list, dim=0)
         pred_scores = torch.cat(pred_score_list, dim=0)
 
-        keep_index = box_utils.nms_rotated(pred_box2ds,
-                                           pred_scores,
-                                           self.params['nms_thresh'])
+        keep_index = box_utils.nms_rotated(pred_box2ds, pred_scores, self.params['nms_thresh'])
         pred_box2ds = pred_box2ds[keep_index]
 
         # filter out the prediction out of the range.
@@ -417,8 +385,7 @@ class BevPostprocessor(BasePostprocessor):
         return pred_box2ds
 
     @staticmethod
-    def visualize(pred_box_tensor, gt_tensor, pcd, show_vis, save_path,
-                  dataset=None):
+    def visualize(pred_box_tensor, gt_tensor, pcd, show_vis, save_path, dataset=None):
         """
         Visualize the BEV 2D prediction, ground truth with point cloud together.
 
@@ -443,9 +410,4 @@ class BevPostprocessor(BasePostprocessor):
             opencood dataset object.
         """
         assert dataset is not None, "dataset argument can't be None"
-        vis_utils.visualize_single_sample_output_bev(pred_box_tensor,
-                                                     gt_tensor,
-                                                     pcd,
-                                                     dataset,
-                                                     show_vis,
-                                                     save_path)
+        vis_utils.visualize_single_sample_output_bev(pred_box_tensor, gt_tensor, pcd, dataset, show_vis, save_path)
