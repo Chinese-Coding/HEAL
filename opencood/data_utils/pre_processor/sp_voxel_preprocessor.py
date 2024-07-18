@@ -49,16 +49,22 @@ class SpVoxelPreprocessor(BasePreprocessor):
                                                   num_point_features=4, max_num_voxels=self.max_voxels)
 
     def preprocess(self, pcd_np):
+        """
+
+        :param pcd_np: 包含点云数据的 numpy 数组
+        :return:
+        """
         data_dict = {}
         if self.spconv == 1:
             voxel_output = self.voxel_generator.generate(pcd_np)
         else:
-            pcd_tv = self.tv.from_numpy(pcd_np)
-            voxel_output = self.voxel_generator.point_to_voxel(pcd_tv)
+            pcd_tv = self.tv.from_numpy(pcd_np)  # 将点云数据转换为 tensorview
+            voxel_output = self.voxel_generator.point_to_voxel(pcd_tv)  # 生成体素
+
         if isinstance(voxel_output, dict):
             voxels, coordinates, num_points = \
                 voxel_output['voxels'], voxel_output['coordinates'], voxel_output['num_points_per_voxel']
-        else:
+        else:  # spconv v2.x 版本
             voxels, coordinates, num_points = voxel_output
 
         if self.spconv == 2:
@@ -123,9 +129,7 @@ class SpVoxelPreprocessor(BasePreprocessor):
         voxel_features = torch.from_numpy(np.concatenate(voxel_features))
         voxel_coords = torch.from_numpy(np.concatenate(voxel_coords))
 
-        return {'voxel_features': voxel_features,
-                'voxel_coords': voxel_coords,
-                'voxel_num_points': voxel_num_points}
+        return {'voxel_features': voxel_features, 'voxel_coords': voxel_coords, 'voxel_num_points': voxel_num_points}
 
     @staticmethod
     def collate_batch_dict(batch: dict):

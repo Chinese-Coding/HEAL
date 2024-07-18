@@ -20,8 +20,8 @@ from opencood.utils.camera_utils import gen_dx_bx, cumsum_trick, QuickCumsum, de
 class PointPillar(nn.Module):
     def __init__(self, args: Mapping) -> NoReturn:
         super().__init__()
-        grid_size = (np.array(args['lidar_range'][3:6]) - np.array(args['lidar_range'][0:3])) / np.array(
-            args['voxel_size'])
+        grid_size = \
+            (np.array(args['lidar_range'][3:6]) - np.array(args['lidar_range'][0:3])) / np.array(args['voxel_size'])
         grid_size = np.round(grid_size).astype(np.int64)
         # TODO: 这样直接向 args 里面添加参数真的好吗?
         args['point_pillar_scatter']['grid_size'] = grid_size
@@ -30,7 +30,7 @@ class PointPillar(nn.Module):
         self.pillar_vfe = PillarVFE(args['pillar_vfe'], 4, args['voxel_size'], args['lidar_range'])
         self.scatter = PointPillarScatter(args['point_pillar_scatter'])
 
-    def forward(self, data_dict: Mapping, modality_name: AnyStr) -> List[Tensor]:
+    def forward(self, data_dict: Mapping, modality_name: str) -> List[Tensor]:
         voxel_features = data_dict[f'inputs_{modality_name}']['voxel_features']
         voxel_coords = data_dict[f'inputs_{modality_name}']['voxel_coords']
         voxel_num_points = data_dict[f'inputs_{modality_name}']['voxel_num_points']

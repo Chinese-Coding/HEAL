@@ -72,6 +72,7 @@ def get_pairwise_transformation(base_data_dict: Mapping, max_cav: int, proj_firs
 def normalize_pairwise_tfm(pairwise_t_matrix: Tensor, H: int, W: int, discrete_ratio: int, downsample_rate=1) -> Tensor:
     """
     normalize the pairwise transformation matrix to affine matrix need by torch.nn.functional.affine_grid()
+    将成对变换矩阵归一化为 torch 所需的仿射矩阵。
     Args:
         pairwise_t_matrix: torch.tensor
             [B, L, L, 4, 4], B batchsize, L max_cav

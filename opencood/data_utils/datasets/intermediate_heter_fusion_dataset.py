@@ -17,8 +17,10 @@ from typing import Mapping
 
 import numpy as np
 import torch
+from networkx import ego_graph
 
 from opencood.data_utils.pre_processor import build_preprocessor
+from opencood.tools.inference_utils import get_cav_box
 from opencood.utils import box_utils as box_utils
 from opencood.utils.camera_utils import (
     sample_augmentation,
@@ -42,6 +44,24 @@ def getIntermediateheterFusionDataset(cls):
     """
     cls: the Basedataset.
     """
+
+    def get_ego_info(base_data_dict: Mapping):
+        """
+        从 base_data_dict 里面找到对应的 ego 车辆, 并对变量进行一些赋值, 同时检查值的合法性
+        """
+        ego_id = -1
+        ego_lidar_pose = []
+        ego_cav_base = None
+        for cav_id, cav_content in base_data_dict.items():
+            if cav_content['ego']:
+                ego_id = cav_id
+                ego_lidar_pose = cav_content['params']['lidar_pose']
+                ego_cav_base = cav_content
+                break
+        assert cav_id == list(base_data_dict.keys())[0], "The first element in the OrderedDict must be ego"
+        assert ego_id != -1
+        assert len(ego_lidar_pose) > 0
+        return ego_id, ego_lidar_pose, ego_cav_base
 
     class IntermediateheterFusionDataset(cls):
         def __init__(self, params: Mapping, visualize: bool, train=True):
@@ -87,7 +107,7 @@ def getIntermediateheterFusionDataset(cls):
 
             self.reinitialize()  # 该函数由父类 (cls) 实现
 
-            self.kd_flag = params.get('kd_flag', False)
+            self.kd_flag = params.get('kd_flag', False)  # TODO：kd_flag 是什么意思？
 
             self.box_align = False
             if "box_align" in params:
@@ -138,8 +158,7 @@ def getIntermediateheterFusionDataset(cls):
                 if self.proj_first:
                     lidar_np[:, :3] = projected_lidar
 
-                if self.visualize:
-                    # filter lidar
+                if self.visualize:  # filter lidar
                     selected_cav_processed.update({'projected_lidar': projected_lidar})
 
                 if self.kd_flag:
@@ -155,12 +174,13 @@ def getIntermediateheterFusionDataset(cls):
 
                 if sensor_type == "lidar":
                     processed_lidar = eval(f"self.pre_processor_{modality_name}").preprocess(lidar_np)
+                    # TODO: `processed_features_` ? 通过上面那个函数, 简单地调几个包就把特征提取出来了?
                     selected_cav_processed.update({f'processed_features_{modality_name}': processed_lidar})
 
             # generate targets label single GT, note the reference pose is itself.
             """
             根据 selected_cav_base 中 ['params']['vehicles'] 生成.  ['params']['vehicles'] 这个里面应该就是人工标注的
-            车辆信息, 根据这个进行训练. 为什么要在两段 if 长代码判断中加这么一段呢
+            车辆信息, 根据这个进行训练. 为什么要在两段 if 长代码判断中加这么一段呢 TODO: post_processor 中好像并没有用到上面提取出来的 feature
             """
             object_bbx_center, object_bbx_mask, object_ids = \
                 self.generate_object_center([selected_cav_base], selected_cav_base['params']['lidar_pose'])
@@ -266,34 +286,15 @@ def getIntermediateheterFusionDataset(cls):
             return selected_cav_processed
 
         def __getitem__(self, idx):
+            # 根据 idx 获取到某一个场景下全部的 cav, 同时添加噪声, 这一步就模拟了通信
             base_data_dict = self.retrieve_base_data(idx)
             base_data_dict = add_noise_data_dict(base_data_dict, self.params['noise_setting'])
 
             processed_data_dict = OrderedDict()
             processed_data_dict['ego'] = {}
 
-            """
-            # first find the ego vehicle's lidar pose
-            从 base_data_dict 里面找到对应的 ego 车辆, 并对变量进行一些赋值, 同时检查值的合法性
-            """
-            ego_id = -1
-            ego_lidar_pose = []
-            ego_cav_base = None
-            for cav_id, cav_content in base_data_dict.items():
-                if cav_content['ego']:
-                    ego_id = cav_id
-                    ego_lidar_pose = cav_content['params']['lidar_pose']
-                    ego_cav_base = cav_content
-                    break
-            assert cav_id == list(base_data_dict.keys())[0], "The first element in the OrderedDict must be ego"
-            assert ego_id != -1
-            assert len(ego_lidar_pose) > 0
-
+            ego_id, ego_lidar_pose, ego_cav_base = get_ego_info(base_data_dict)
             # can contain lidar or camera
-            # input_list_m1 = []
-            # input_list_m2 = []
-            # input_list_m3 = []
-            # input_list_m4 = []
             input_list_dict = {
                 'input_list_m1': [],
                 'input_list_m2': [],
@@ -303,23 +304,16 @@ def getIntermediateheterFusionDataset(cls):
 
             agent_modality_list = []
             object_stack = []
-            object_id_stack = []
+            object_id_stack = []  # 存储着某一场景下全部 cav 标记的全部物体的 id (不再按照场景下 cav 的 id 来进行分类)
             single_label_list = []
             single_object_bbx_center_list = []
             single_object_bbx_mask_list = []
-            exclude_agent = []
-            lidar_pose_list = []
-            lidar_pose_clean_list = []
-            cav_id_list = []
             projected_lidar_clean_list = []  # disconet
 
             # TODO：和可视化有关的部分, 也许可以先不用看?
             if self.visualize or self.kd_flag:
                 projected_lidar_stack = []
-                # input_list_m1_proj = []  # 2023.8.31 to correct discretization errors with kd flag
-                # input_list_m2_proj = []
-                # input_list_m3_proj = []
-                # input_list_m4_proj = []
+                # 2023.8.31 to correct discretization errors with kd flag
                 input_list_proj_dict = {
                     'input_list_m1_proj': [],
                     'input_list_m2_proj': [],
@@ -327,32 +321,11 @@ def getIntermediateheterFusionDataset(cls):
                     'input_list_m4_proj': [],
                 }
 
-            # loop over all CAVs to process information
-            # 过滤掉不在通信范围内的, 没有指定模态的
-            for cav_id, selected_cav_base in base_data_dict.items():
-                # check if the cav is within the communication range with ego
-                # 简单的勾股定理
-                distance = math.sqrt((selected_cav_base['params']['lidar_pose'][0] - ego_lidar_pose[0]) ** 2 +
-                                     (selected_cav_base['params']['lidar_pose'][1] - ego_lidar_pose[1]) ** 2)
-
-                # if distance is too far, we will just skip this agent
-                if distance > self.params['comm_range']:
-                    exclude_agent.append(cav_id)
-                    continue
-
-                # if modality not match
-                if self.adaptor.unmatched_modality(selected_cav_base['modality_name']):
-                    exclude_agent.append(cav_id)
-                    continue
-
-                lidar_pose_clean_list.append(selected_cav_base['params']['lidar_pose_clean'])
-                lidar_pose_list.append(selected_cav_base['params']['lidar_pose'])  # 6dof pose
-                cav_id_list.append(cav_id)
-
+            cav_id_list, exclude_agent, lidar_pose_clean_list, lidar_pose_list = \
+                self._get_legal_cav_ids(base_data_dict, ego_lidar_pose)
             if len(cav_id_list) == 0:
                 return None
-
-            for cav_id in exclude_agent:
+            for cav_id in exclude_agent:  # 弹出非法的 id, TODO: 不弹出会怎么样呢?
                 base_data_dict.pop(cav_id)
 
             """和对齐有关的部分? 也许可以先不用看?"""
@@ -398,9 +371,15 @@ def getIntermediateheterFusionDataset(cls):
             # 判断一下, 如果不添加噪声, 两者应该是相同的
             assert not (self.params['noise_setting']['add_noise'] and lidar_poses != lidar_poses_clean)
 
-            # merge preprocessed features from different cavs into the same dict
+            """
+            merge preprocessed features from different cavs into the same dict
+            将来自不同cav的预处理特征合并到同一字典中
+            """
             cav_num = len(cav_id_list)
-
+            # agent_modality_list, object_stack, object_id_stack, single_label_list, \
+            #     single_object_bbx_center_list, single_object_bbx_mask_list = \
+            #     self._merge_cav_features(base_data_dict, cav_id_list, input_list_dict, projected_lidar_stack,
+            #                              input_list_proj_dict)
             for _i, cav_id in enumerate(cav_id_list):
                 selected_cav_base = base_data_dict[cav_id]
                 modality_name = selected_cav_base['modality_name']
@@ -431,7 +410,9 @@ def getIntermediateheterFusionDataset(cls):
                     raise
 
                 agent_modality_list.append(modality_name)
-
+                """
+                这部分应该还是和可视化有关的, 所以还是不用看
+                """
                 if self.visualize or self.kd_flag:
                     # heterogeneous setting do not support disconet' kd
                     projected_lidar_stack.append(selected_cav_processed['projected_lidar'])
@@ -447,6 +428,9 @@ def getIntermediateheterFusionDataset(cls):
                     single_object_bbx_mask_list.append(selected_cav_processed['single_object_bbx_mask'])
 
             # generate single view GT label
+            """
+            将之前获得的数据从 numpy 类型转换为 torch 类型, 然后放到字典里面
+            """
             if self.supervise_single or self.heterogeneous:
                 single_label_dicts = self.post_processor.collate_batch(single_label_list)
                 single_object_bbx_center = torch.from_numpy(np.array(single_object_bbx_center_list))
@@ -458,6 +442,9 @@ def getIntermediateheterFusionDataset(cls):
                 })
 
             # exculude all repetitve objects, DAIR-V2X
+            """
+            对 dairv2x 的特殊处理, 我感觉也应该封装到一个函数里面
+            """
             if self.params['fusion']['dataset'] == 'dairv2x':
                 if len(object_stack) == 1:
                     object_stack = object_stack[0]
@@ -489,11 +476,12 @@ def getIntermediateheterFusionDataset(cls):
                 object_id_stack = np.arange(object_stack.shape[0])
             else:
                 # exclude all repetitive objects, OPV2V-H
-                unique_indices = [object_id_stack.index(x) for x in set(object_id_stack)]
+                unique_indices = [object_id_stack.index(x) for x in set(object_id_stack)]  # id 去重, 提取出索引
+                # `np.vstack` 纵向堆叠, 一开始 object_stack 是一个 list, 所以用 `np.vstack` 进行将为, object_stack 里面的内容提取出来
                 object_stack = np.vstack(object_stack)
                 object_stack = object_stack[unique_indices]
 
-            # make sure bounding boxes across all frames have the same number
+            # make sure bounding boxes across all frames have the same number # TODO: 应该就是一个对齐操作
             object_bbx_center = np.zeros((self.params['postprocess']['max_num'], 7))
             mask = np.zeros(self.params['postprocess']['max_num'])
             object_bbx_center[:object_stack.shape[0], :] = object_stack
@@ -502,6 +490,10 @@ def getIntermediateheterFusionDataset(cls):
             for modality_name in self.modality_name_list:
                 if self.sensor_type_dict[modality_name] == "lidar":
                     # merged_feature_dict = merge_features_to_dict(eval(f"input_list_{modality_name}"))
+                    """
+                    一开始 input_list_dict 按照 cav_id 的数量分别存储着 'voxel_coords', 'voxel_coords', 'voxel_num_points'
+                    经过这个函数后, 上述三个键分别存储着 cav_id 中的对应数据
+                    """
                     merged_feature_dict = merge_features_to_dict(input_list_dict[f"input_list_{modality_name}"])
                     processed_data_dict['ego'].update({f'input_{modality_name}': merged_feature_dict})  # maybe None
                 elif self.sensor_type_dict[modality_name] == "camera":
@@ -511,7 +503,9 @@ def getIntermediateheterFusionDataset(cls):
                     #                                                   merge='stack')
                     processed_data_dict['ego'].update(
                         {f'input_{modality_name}': merged_image_inputs_dict})  # maybe None
-
+            """
+            是不是有 kd_flag 的地方就是和可视化有关的呢? 与可视化有关的东西都不看???
+            """
             if self.kd_flag:
                 # heterogenous setting do not support DiscoNet's kd
                 # stack_lidar_np = np.vstack(projected_lidar_stack)
@@ -533,7 +527,10 @@ def getIntermediateheterFusionDataset(cls):
             # generate targets label
             label_dict = self.post_processor.generate_label(gt_box_center=object_bbx_center, anchors=self.anchor_box,
                                                             mask=mask)
-
+            """
+            TODO: 最后返回的给模型的数据, 包含以下内容
+            里面的许多参数我都见过许多类似的, 内容经过更新
+            """
             processed_data_dict['ego'].update({
                 'object_bbx_center': object_bbx_center,
                 'object_bbx_mask': mask,
@@ -785,5 +782,82 @@ def getIntermediateheterFusionDataset(cls):
             gt_box_tensor = self.post_processor.generate_gt_bbx(data_dict)
 
             return pred_box_tensor, pred_score, gt_box_tensor
+
+        def _get_legal_cav_ids(self, base_data_dict: Mapping, ego_lidar_pose: list):
+            """
+            获取合法的 cav id. 合法的含义: 在 ego 通信范围内, 被分配过模态
+            """
+            # 分别存储合法的和不合法的 cav id
+            cav_id_list, exclude_agent = [], []
+            # 分别存储合法的 cav 对应的 无噪声 lidar pose 和 有噪声 lidar pose
+            lidar_pose_clean_list, lidar_pose_list = [], []
+
+            for cav_id, selected_cav_base in base_data_dict.items():
+                # 使用勾股定理来判断是否在通信范围内check if the cav is within the communication range with ego
+                distance = math.sqrt((selected_cav_base['params']['lidar_pose'][0] - ego_lidar_pose[0]) ** 2 +
+                                     (selected_cav_base['params']['lidar_pose'][1] - ego_lidar_pose[1]) ** 2)
+                # if distance is too far, we will just skip this agent
+                if distance > self.params['comm_range']:
+                    exclude_agent.append(cav_id)
+                    continue
+                # if modality not match
+                if self.adaptor.unmatched_modality(selected_cav_base['modality_name']):
+                    exclude_agent.append(cav_id)
+                    continue
+                lidar_pose_clean_list.append(selected_cav_base['params']['lidar_pose_clean'])
+                lidar_pose_list.append(selected_cav_base['params']['lidar_pose'])  # 6dof pose
+                cav_id_list.append(cav_id)
+            return cav_id_list, exclude_agent, lidar_pose_clean_list, lidar_pose_list
+
+        def _merge_cav_features(self, base_data_dict, cav_id_list, ego_cav_base, input_list_dict,
+                                projected_lidar_stack=None, input_list_proj_dict=None):
+            agent_modality_list = []
+            object_stack, object_id_stack = [], []
+            single_label_list, single_object_bbx_center_list, single_object_bbx_mask_list = [], [], []
+            for _i, cav_id in enumerate(cav_id_list):
+                selected_cav_base = base_data_dict[cav_id]
+                modality_name = selected_cav_base['modality_name']
+                sensor_type = self.sensor_type_dict[selected_cav_base['modality_name']]
+
+                # dynamic object center generator! for heterogeneous input
+                if not self.visualize:
+                    self.generate_object_center = eval(f"self.generate_object_center_{sensor_type}")
+                # need discussion. In test phase, use lidar label.
+                else:
+                    self.generate_object_center = self.generate_object_center_lidar
+
+                selected_cav_processed = self.get_item_single_car(selected_cav_base, ego_cav_base)
+
+                object_stack.append(selected_cav_processed['object_bbx_center'])
+                object_id_stack += selected_cav_processed['object_ids']
+
+                if sensor_type == "lidar":
+                    input_list_dict[f'input_list_{modality_name}'].append(
+                        selected_cav_processed[f"processed_features_{modality_name}"])
+
+                elif sensor_type == "camera":
+                    input_list_dict[f"input_list_{modality_name}"].append(
+                        selected_cav_processed[f"image_inputs_{modality_name}"])
+                else:
+                    raise
+
+                agent_modality_list.append(modality_name)
+                """
+                这部分应该还是和可视化有关的, 所以还是不用看
+                """
+                if self.visualize or self.kd_flag:
+                    # heterogeneous setting do not support disconet' kd
+                    projected_lidar_stack.append(selected_cav_processed['projected_lidar'])
+                    if sensor_type == "lidar" and self.kd_flag:
+                        input_list_proj_dict[f"input_list_{modality_name}_proj"].append(
+                            selected_cav_processed[f"processed_features_{modality_name}_proj"])
+
+                if self.supervise_single or self.heterogeneous:
+                    single_label_list.append(selected_cav_processed['single_label_dict'])
+                    single_object_bbx_center_list.append(selected_cav_processed['single_object_bbx_center'])
+                    single_object_bbx_mask_list.append(selected_cav_processed['single_object_bbx_mask'])
+
+            return agent_modality_list, object_stack, object_id_stack, \
+                single_label_list, single_object_bbx_center_list, single_object_bbx_mask_list
 
     return IntermediateheterFusionDataset

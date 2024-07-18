@@ -81,8 +81,7 @@ def mask_ego_points(points):
     points : np.ndarray
         Filtered lidar points.
     """
-    mask = (points[:, 0] >= -1.95) & (points[:, 0] <= 2.95) \
-           & (points[:, 1] >= -1.1) & (points[:, 1] <= 1.1)
+    mask = (points[:, 0] >= -1.95) & (points[:, 0] <= 2.95) & (points[:, 1] >= -1.1) & (points[:, 1] <= 1.1)
     points = points[np.logical_not(mask)]
 
     return points

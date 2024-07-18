@@ -8,6 +8,7 @@ import statistics
 from datetime import datetime
 
 import torch
+from click.core import batch
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -48,11 +49,11 @@ def main():
 
     train_loader = DataLoader(train_dataset, batch_size=hypes['train_params']['batch_size'],
                               num_workers=4, collate_fn=train_dataset.collate_batch_train,
-                              shuffle=True, pin_memory=True, drop_last=True, prefetch_factor=2)
+                              shuffle=False, pin_memory=True, drop_last=True, prefetch_factor=2)
 
     val_loader = DataLoader(validate_dataset, batch_size=hypes['train_params']['batch_size'],
                             num_workers=4, collate_fn=train_dataset.collate_batch_train,
-                            shuffle=True, pin_memory=True, drop_last=True, prefetch_factor=2)
+                            shuffle=False, pin_memory=True, drop_last=True, prefetch_factor=2)
     logger.success('数据集加载完毕, 开始创建模型')
 
     model = train_utils.create_model(hypes['model']['core_method'], hypes['model']['args'])

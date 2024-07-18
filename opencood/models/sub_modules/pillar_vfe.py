@@ -199,7 +199,6 @@ class PillarVFE(nn.Module):
         由0填充的数据在计算出现xc,yc,zc和xp,yp,zp出现数值，所以需要将这个被填充的数据的这些数值清0,
         因此使用get_paddings_indicator计算features中哪些是需要被保留真实数据和需要被置0的填充数据
         """
-
         mask = self.get_paddings_indicator(voxel_num_points, voxel_count, axis=0)  # mask.shape = [M, 32]
         mask = torch.unsqueeze(mask, -1).type_as(voxel_features)  # mask.shape = [M, 32, 1]
         features *= mask
