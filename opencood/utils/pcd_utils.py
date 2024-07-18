@@ -34,7 +34,7 @@ def pcd_to_np(pcd_file: str):
     # 注意：xyz 和 intensity 标注的 shape 在每次读取时点的数量可能不同，但是维度是唯一的
     xyz = np.asarray(pcd.points)  # xyz.shape = (58547, 3)
     # we save the intensity (强度) in the first channel
-    intensity = np.expand_dims(np.asarray(pcd.colors)[:, 0], -1) # intensity.shape = (58547, 1)
+    intensity = np.expand_dims(np.asarray(pcd.colors)[:, 0], -1)  # intensity.shape = (58547, 1)
     pcd_np = np.hstack((xyz, intensity))
 
     return np.asarray(pcd_np, dtype=np.float32)
@@ -59,10 +59,8 @@ def mask_points_by_range(points, limit_range):
     """
 
     mask = (points[:, 0] > limit_range[0]) & (points[:, 0] < limit_range[3]) \
-           & (points[:, 1] > limit_range[1]) & (
-                   points[:, 1] < limit_range[4]) \
-           & (points[:, 2] > limit_range[2]) & (
-                   points[:, 2] < limit_range[5])
+           & (points[:, 1] > limit_range[1]) & (points[:, 1] < limit_range[4]) \
+           & (points[:, 2] > limit_range[2]) & (points[:, 2] < limit_range[5])
 
     points = points[mask]
 

@@ -412,15 +412,10 @@ class OPV2VBaseDataset(BaseDataset):
         return self.post_processor.generate_visible_object_center(cav_contents, reference_lidar_pose)
 
     def get_ext_int(self, params, camera_id):
-        camera_coords = np.array(params["camera%d" % camera_id]["cords"]).astype(
-            np.float32)
-        camera_to_lidar = x1_to_x2(
-            camera_coords, params["lidar_pose_clean"]
-        ).astype(np.float32)  # T_LiDAR_camera
+        camera_coords = np.array(params["camera%d" % camera_id]["cords"]).astype(np.float32)
+        camera_to_lidar = x1_to_x2(camera_coords, params["lidar_pose_clean"]).astype(np.float32)  # T_LiDAR_camera
         camera_to_lidar = camera_to_lidar @ np.array(
             [[0, 0, 1, 0], [1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 1]],
             dtype=np.float32)  # UE4 coord to opencv coord
-        camera_intrinsic = np.array(params["camera%d" % camera_id]["intrinsic"]).astype(
-            np.float32
-        )
+        camera_intrinsic = np.array(params["camera%d" % camera_id]["intrinsic"]).astype(   np.float32       )
         return camera_to_lidar, camera_intrinsic

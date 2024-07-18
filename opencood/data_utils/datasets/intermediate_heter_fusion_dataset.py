@@ -104,8 +104,7 @@ def getIntermediateheterFusionDataset(cls):
             Parameters
             ----------
             selected_cav_base : dict
-                The dictionary contains a single CAV's raw information.
-                including 'params', 'camera_data'
+                The dictionary contains a single CAV's raw information including 'params', 'camera_data'
             ego_pose : list, length 6
                 The ego vehicle lidar pose under world coordinate.
             ego_pose_clean : list, length 6
@@ -159,6 +158,10 @@ def getIntermediateheterFusionDataset(cls):
                     selected_cav_processed.update({f'processed_features_{modality_name}': processed_lidar})
 
             # generate targets label single GT, note the reference pose is itself.
+            """
+            根据 selected_cav_base 中 ['params']['vehicles'] 生成.  ['params']['vehicles'] 这个里面应该就是人工标注的
+            车辆信息, 根据这个进行训练. 为什么要在两段 if 长代码判断中加这么一段呢
+            """
             object_bbx_center, object_bbx_mask, object_ids = \
                 self.generate_object_center([selected_cav_base], selected_cav_base['params']['lidar_pose'])
             label_dict = self.post_processor.generate_label(
@@ -230,21 +233,21 @@ def getIntermediateheterFusionDataset(cls):
                     post_rots.append(post_rot)
                     post_trans.append(post_tran)
 
-                selected_cav_processed.update(
-                    {
-                        f"image_inputs_{modality_name}":
-                            {
-                                "imgs": torch.stack(imgs),  # [Ncam, 3or4, H, W]
-                                "intrins": torch.stack(intrins),
-                                "extrinsics": torch.stack(extrinsics),
-                                "rots": torch.stack(rots),
-                                "trans": torch.stack(trans),
-                                "post_rots": torch.stack(post_rots),
-                                "post_trans": torch.stack(post_trans),
-                            }
+                selected_cav_processed.update({
+                    f"image_inputs_{modality_name}": {
+                        "imgs": torch.stack(imgs),  # [Ncam, 3or4, H, W]
+                        "intrins": torch.stack(intrins),
+                        "extrinsics": torch.stack(extrinsics),
+                        "rots": torch.stack(rots),
+                        "trans": torch.stack(trans),
+                        "post_rots": torch.stack(post_rots),
+                        "post_trans": torch.stack(post_trans),
                     }
-                )
-
+                })
+            """
+            感觉这部分代码完全可以和它上面这段 if 语句的上面一段放在一起
+            这一段是根据真是位置生成框, 上一段是根据有噪声的位置 (如果没有设置添加噪声, 这两部分生成的框应该是相同的)
+            """
             # anchor box
             selected_cav_processed.update({"anchor_box": self.anchor_box})
 
@@ -252,15 +255,13 @@ def getIntermediateheterFusionDataset(cls):
             object_bbx_center, object_bbx_mask, object_ids = \
                 self.generate_object_center([selected_cav_base], ego_pose_clean)
 
-            selected_cav_processed.update(
-                {
-                    "object_bbx_center": object_bbx_center[object_bbx_mask == 1],
-                    "object_bbx_mask": object_bbx_mask,
-                    "object_ids": object_ids,
-                    'transformation_matrix': transformation_matrix,
-                    'transformation_matrix_clean': transformation_matrix_clean
-                }
-            )
+            selected_cav_processed.update({
+                "object_bbx_center": object_bbx_center[object_bbx_mask == 1],
+                "object_bbx_mask": object_bbx_mask,
+                "object_ids": object_ids,
+                'transformation_matrix': transformation_matrix,
+                'transformation_matrix_clean': transformation_matrix_clean
+            })
 
             return selected_cav_processed
 
@@ -354,6 +355,7 @@ def getIntermediateheterFusionDataset(cls):
             for cav_id in exclude_agent:
                 base_data_dict.pop(cav_id)
 
+            """和对齐有关的部分? 也许可以先不用看?"""
             ########## Updated by Yifan Lu 2022.1.26 ############
             # box align to correct pose.
             # stage1_content contains all agent. Even out of comm range.
@@ -368,8 +370,8 @@ def getIntermediateheterFusionDataset(cls):
                     cur_agent_id_list = cav_id_list
                     cur_agent_pose = [base_data_dict[cav_id]['params']['lidar_pose'] for cav_id in cav_id_list]
                     cur_agnet_pose = np.array(cur_agent_pose)
-                    cur_agent_in_all_agent = [all_agent_id_list.index(cur_agent) for cur_agent in
-                                              cur_agent_id_list]  # indexing current agent in `all_agent_id_list`
+                    # indexing current agent in `all_agent_id_list`
+                    cur_agent_in_all_agent = [all_agent_id_list.index(cur_agent) for cur_agent in cur_agent_id_list]
 
                     pred_corners_list = [np.array(all_agent_corners_list[cur_in_all_ind], dtype=np.float64)
                                          for cur_in_all_ind in cur_agent_in_all_agent]
@@ -377,8 +379,7 @@ def getIntermediateheterFusionDataset(cls):
                                         for cur_in_all_ind in cur_agent_in_all_agent]
 
                     if sum([len(pred_corners) for pred_corners in pred_corners_list]) != 0:
-                        refined_pose = box_alignment_relative_sample_np(pred_corners_list,
-                                                                        cur_agnet_pose,
+                        refined_pose = box_alignment_relative_sample_np(pred_corners_list, cur_agnet_pose,
                                                                         uncertainty_list=uncertainty_list,
                                                                         **self.box_align_args)
                         cur_agnet_pose[:, [0, 1, 4]] = refined_pose
@@ -386,11 +387,16 @@ def getIntermediateheterFusionDataset(cls):
                         for i, cav_id in enumerate(cav_id_list):
                             lidar_pose_list[i] = cur_agnet_pose[i].tolist()
                             base_data_dict[cav_id]['params']['lidar_pose'] = cur_agnet_pose[i].tolist()
+
             # 坐标转换矩阵, 两两之间各有一个
             pairwise_t_matrix = get_pairwise_transformation(base_data_dict, self.max_cav, self.proj_first)
 
+            # 提取出含有噪声和无噪声的数据 (如果没有设置噪声, 这两个应该是一样的)
             lidar_poses = np.array(lidar_pose_list).reshape(-1, 6)  # [N_cav, 6]
             lidar_poses_clean = np.array(lidar_pose_clean_list).reshape(-1, 6)  # [N_cav, 6]
+
+            # 判断一下, 如果不添加噪声, 两者应该是相同的
+            assert not (self.params['noise_setting']['add_noise'] and lidar_poses != lidar_poses_clean)
 
             # merge preprocessed features from different cavs into the same dict
             cav_num = len(cav_id_list)
@@ -428,8 +434,7 @@ def getIntermediateheterFusionDataset(cls):
 
                 if self.visualize or self.kd_flag:
                     # heterogeneous setting do not support disconet' kd
-                    projected_lidar_stack.append(
-                        selected_cav_processed['projected_lidar'])
+                    projected_lidar_stack.append(selected_cav_processed['projected_lidar'])
                     if sensor_type == "lidar" and self.kd_flag:
                         input_list_proj_dict[f"input_list_{modality_name}_proj"].append(
                             selected_cav_processed[f"processed_features_{modality_name}_proj"])
@@ -529,24 +534,22 @@ def getIntermediateheterFusionDataset(cls):
             label_dict = self.post_processor.generate_label(gt_box_center=object_bbx_center, anchors=self.anchor_box,
                                                             mask=mask)
 
-            processed_data_dict['ego'].update(
-                {'object_bbx_center': object_bbx_center,
-                 'object_bbx_mask': mask,
-                 'object_ids': [object_id_stack[i] for i in unique_indices],
-                 'anchor_box': self.anchor_box,
-                 'label_dict': label_dict,
-                 'cav_num': cav_num,
-                 'pairwise_t_matrix': pairwise_t_matrix,
-                 'lidar_poses_clean': lidar_poses_clean,
-                 'lidar_poses': lidar_poses})
+            processed_data_dict['ego'].update({
+                'object_bbx_center': object_bbx_center,
+                'object_bbx_mask': mask,
+                'object_ids': [object_id_stack[i] for i in unique_indices],
+                'anchor_box': self.anchor_box,
+                'label_dict': label_dict,
+                'cav_num': cav_num,
+                'pairwise_t_matrix': pairwise_t_matrix,
+                'lidar_poses_clean': lidar_poses_clean,
+                'lidar_poses': lidar_poses
+            })
 
             if self.visualize:
-                processed_data_dict['ego'].update({'origin_lidar':
-                    np.vstack(
-                        projected_lidar_stack)})
+                processed_data_dict['ego'].update({'origin_lidar': np.vstack(projected_lidar_stack)})
 
-            processed_data_dict['ego'].update({'sample_idx': idx,
-                                               'cav_id_list': cav_id_list})
+            processed_data_dict['ego'].update({'sample_idx': idx, 'cav_id_list': cav_id_list})
 
             return processed_data_dict
 

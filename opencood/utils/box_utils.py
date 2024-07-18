@@ -22,6 +22,7 @@ def corner_to_center_torch(corner3d, order='lwh'):
     corner3d_ = corner3d.cpu().numpy()
     return torch.from_numpy(corner_to_center(corner3d_, order)).to(corner3d.device)
 
+
 def corner_to_center(corner3d, order='lwh'):
     """
     Convert 8 corners to x, y, z, dx, dy, dz, yaw.
@@ -196,9 +197,7 @@ def boxes_to_corners_3d(boxes3d, order):
     )) / 2
 
     corners3d = boxes3d_[:, None, 3:6].repeat(1, 8, 1) * template[None, :, :]
-    corners3d = common_utils.rotate_points_along_z(corners3d.view(-1, 8, 3),
-                                                   boxes3d_[:, 6]).view(-1, 8,
-                                                                        3)
+    corners3d = common_utils.rotate_points_along_z(corners3d.view(-1, 8, 3), boxes3d_[:, 6]).view(-1, 8, 3)
     corners3d += boxes3d_[:, None, 0:3]
 
     return corners3d.numpy() if is_numpy else corners3d
@@ -381,8 +380,7 @@ def get_mask_for_boxes_within_range_torch(boxes, gt_range):
     return mask
 
 
-def mask_boxes_outside_range_numpy(boxes, limit_range, order,
-                                   min_num_corners=8, return_mask=False):
+def mask_boxes_outside_range_numpy(boxes, limit_range, order, min_num_corners=8, return_mask=False):
     """
     Parameters
     ----------
@@ -448,15 +446,10 @@ def create_bbx(extent):
     return bbx
 
 
-def project_world_objects(object_dict,
-                          output_dict,
-                          lidar_pose,
-                          lidar_range,
-                          order,
-                          enlarge_z=False):
+def project_world_objects(object_dict, output_dict, lidar_pose, lidar_range, order, enlarge_z=False):
     """
-    Project the objects under world coordinates into another coordinate
-    based on the provided extrinsic.
+    Project the objects under world coordinates into another coordinate based on the provided extrinsic.
+    将世界坐标系中的物体投影到另一个基于提供的外部参数的坐标系中
 
     Parameters
     ----------
@@ -478,14 +471,13 @@ def project_world_objects(object_dict,
     for object_id, object_content in object_dict.items():
         location = object_content['location']
         rotation = object_content['angle']
-        center = [0,0,0] if 'center' not in object_content else object_content['center']
+        center = [0, 0, 0] if 'center' not in object_content else object_content['center']
         extent = object_content['extent']
 
         object_pose = [location[0] + center[0],
                        location[1] + center[1],
                        location[2] + center[2],
                        rotation[0], rotation[1], rotation[2]]
-
 
         object2lidar = x1_to_x2(object_pose, lidar_pose)
 
@@ -504,21 +496,14 @@ def project_world_objects(object_dict,
             lidar_range_z_larger[2] -= 10
             lidar_range_z_larger[5] += 10
             lidar_range = lidar_range_z_larger
-        
-        bbx_lidar = mask_boxes_outside_range_numpy(bbx_lidar,
-                                                   lidar_range,
-                                                   order)
+
+        bbx_lidar = mask_boxes_outside_range_numpy(bbx_lidar, lidar_range, order)
 
         if bbx_lidar.shape[0] > 0:
             output_dict.update({object_id: bbx_lidar})
 
 
-def project_world_objects_v2x(object_dict,
-                          output_dict,
-                          reference_lidar_pose,
-                          lidar_range,
-                          order,
-                          lidar_np):
+def project_world_objects_v2x(object_dict, output_dict, reference_lidar_pose, lidar_range, order, lidar_np):
     """
     Project the objects under world coordinates into another coordinate
     based on the provided extrinsic.
@@ -552,42 +537,40 @@ def project_world_objects_v2x(object_dict,
     gt_boxes = object_dict['gt_boxes']
     object_ids = object_dict['object_ids']
     for i, object_content in enumerate(gt_boxes):
-        x,y,z,dx,dy,dz,w,a,b,c = object_content
+        x, y, z, dx, dy, dz, w, a, b, c = object_content
 
-        q = Quaternion([w,a,b,c])
+        q = Quaternion([w, a, b, c])
         T_world_object = q.transformation_matrix
-        T_world_object[:3,3] = object_content[:3]
+        T_world_object[:3, 3] = object_content[:3]
 
         T_world_lidar = x_to_world(reference_lidar_pose)
 
-        object2lidar = np.linalg.solve(T_world_lidar, T_world_object) # T_lidar_object
+        object2lidar = np.linalg.solve(T_world_lidar, T_world_object)  # T_lidar_object
 
-
-        # shape (3, 8). 
+        # shape (3, 8).
         # or we can use the create_bbx funcion.
-        x_corners = dx / 2 * np.array([ 1,  1, -1, -1,  1,  1, -1, -1]) # (8,)
-        y_corners = dy / 2 * np.array([-1,  1,  1, -1, -1,  1,  1, -1])
-        z_corners = dz / 2 * np.array([-1, -1, -1, -1,  1,  1,  1,  1])
+        x_corners = dx / 2 * np.array([1, 1, -1, -1, 1, 1, -1, -1])  # (8,)
+        y_corners = dy / 2 * np.array([-1, 1, 1, -1, -1, 1, 1, -1])
+        z_corners = dz / 2 * np.array([-1, -1, -1, -1, 1, 1, 1, 1])
 
-        bbx = np.vstack((x_corners, y_corners, z_corners)) # (3, 8)
+        bbx = np.vstack((x_corners, y_corners, z_corners))  # (3, 8)
 
         # bounding box under ego coordinate shape (4, 8)
         bbx = np.r_[bbx, [np.ones(bbx.shape[1])]]
 
         # project the 8 corners to world coordinate
-        bbx_lidar = np.dot(object2lidar, bbx).T # (8, 4)
-        bbx_lidar = np.expand_dims(bbx_lidar[:, :3], 0) # (1, 8, 3)
+        bbx_lidar = np.dot(object2lidar, bbx).T  # (8, 4)
+        bbx_lidar = np.expand_dims(bbx_lidar[:, :3], 0)  # (1, 8, 3)
         bbx_lidar = corner_to_center(bbx_lidar, order=order)
-        
+
         lidar_range_z_larger = copy.deepcopy(lidar_range)
         lidar_range_z_larger[2] -= 1
         lidar_range_z_larger[5] += 1
-        
+
         bbx_lidar = mask_boxes_outside_range_numpy(bbx_lidar,
                                                    lidar_range_z_larger,
                                                    order)
 
-        
         if bbx_lidar.shape[0] > 0:
             output_dict.update({object_ids[i]: bbx_lidar})
 
@@ -922,14 +905,8 @@ def project_points_by_matrix_torch(points, transformation_matrix):
         else projected_points[:, :3].numpy()
 
 
-def box_encode(
-        boxes,
-        anchors,
-        encode_angle_to_vector=False,
-        encode_angle_with_residual=False,
-        smooth_dim=False,
-        norm_velo=False
-):
+def box_encode(boxes, anchors, encode_angle_to_vector=False,
+               encode_angle_with_residual=False, smooth_dim=False, norm_velo=False):
     """box encode for VoxelNet
         Args:
             boxes ([N, 7] Tensor): normal boxes: x, y, z, w, l, h, r.
@@ -988,15 +965,8 @@ def box_encode(
     return torch.cat(ret, dim=-1)
 
 
-def box_decode(
-        box_encodings,
-        anchors,
-        encode_angle_to_vector=False,
-        encode_angle_with_residual=False,
-        bin_loss=False,
-        smooth_dim=False,
-        norm_velo=False,
-):
+def box_decode(box_encodings, anchors, encode_angle_to_vector=False, encode_angle_with_residual=False,
+               bin_loss=False, smooth_dim=False, norm_velo=False, ):
     """box decode for VoxelNet in lidar
     Args:
         boxes ([N, 7] Tensor): normal boxes: x, y, z, w, l, h, r
@@ -1061,11 +1031,7 @@ def box_decode(
     return torch.cat(ret, dim=-1)
 
 
-def project_world_objects_dairv2x(object_list,
-                          output_dict,
-                          lidar_pose,
-                          lidar_range,
-                          order):
+def project_world_objects_dairv2x(object_list, output_dict, lidar_pose, lidar_range, order):
     """
     Project the objects under world coordinates into another coordinate
     based on the provided extrinsic.
@@ -1089,32 +1055,29 @@ def project_world_objects_dairv2x(object_list,
     """
     i = 0
 
-    for object_content in object_list: 
+    for object_content in object_list:
         object_id = i
         i = i + 1
-        lidar_to_world = x_to_world(lidar_pose) # T_world_lidar
+        lidar_to_world = x_to_world(lidar_pose)  # T_world_lidar
         world_to_lidar = np.linalg.inv(lidar_to_world)
 
-        corners_world = np.array(object_content['world_8_points']) # [8,3]
-        corners_world_homo = np.pad(corners_world, ((0,0), (0,1)), constant_values=1) # [8, 4]
-        corners_lidar = (world_to_lidar @ corners_world_homo.T).T 
+        corners_world = np.array(object_content['world_8_points'])  # [8,3]
+        corners_world_homo = np.pad(corners_world, ((0, 0), (0, 1)), constant_values=1)  # [8, 4]
+        corners_lidar = (world_to_lidar @ corners_world_homo.T).T
 
         lidar_range_z_larger = copy.deepcopy(lidar_range)
         lidar_range_z_larger[2] -= 1
         lidar_range_z_larger[5] += 1
 
         bbx_lidar = corners_lidar
-        bbx_lidar = np.expand_dims(bbx_lidar[:, :3], 0) # [1, 8, 3]
+        bbx_lidar = np.expand_dims(bbx_lidar[:, :3], 0)  # [1, 8, 3]
         bbx_lidar = corner_to_center(bbx_lidar, order=order)
         bbx_lidar = mask_boxes_outside_range_numpy(bbx_lidar, lidar_range_z_larger, order)
         if bbx_lidar.shape[0] > 0:
             output_dict.update({object_id: bbx_lidar})
 
 
-def load_single_objects_dairv2x(object_list,
-                          output_dict,
-                          lidar_range,
-                          order):
+def load_single_objects_dairv2x(object_list, output_dict, lidar_range, order):
     """
 
     Parameters
@@ -1133,7 +1096,7 @@ def load_single_objects_dairv2x(object_list,
     """
 
     i = 0
-    for object_content in object_list:        
+    for object_content in object_list:
         object_id = i
         if 'rotation' not in object_content:
             print(object_content)
@@ -1145,12 +1108,12 @@ def load_single_objects_dairv2x(object_list,
         w = object_content['3d_dimensions']['w']
         rotation = object_content['rotation']
 
-        if isinstance(x, str): # in camera label, xyz are str
+        if isinstance(x, str):  # in camera label, xyz are str
             x = eval(x)
             y = eval(y)
             z = eval(z)
 
-        if l==0 or h ==0 or w==0:
+        if l == 0 or h == 0 or w == 0:
             continue
         i = i + 1
 
@@ -1158,25 +1121,20 @@ def load_single_objects_dairv2x(object_list,
         lidar_range_z_larger[2] -= 1
         lidar_range_z_larger[5] += 1
 
-        bbx_lidar = [x,y,z,h,w,l,rotation] if order=="hwl" else [x,y,z,l,w,h,rotation] # suppose order is in ['hwl', 'lwh']
-        bbx_lidar = np.array(bbx_lidar).reshape(1,-1) # [1,7]
+        bbx_lidar = [x, y, z, h, w, l, rotation] if order == "hwl" else [x, y, z, l, w, h,
+                                                                         rotation]  # suppose order is in ['hwl', 'lwh']
+        bbx_lidar = np.array(bbx_lidar).reshape(1, -1)  # [1,7]
 
         bbx_lidar = mask_boxes_outside_range_numpy(bbx_lidar, lidar_range_z_larger, order)
         if bbx_lidar.shape[0] > 0:
             if object_content['type'] == "Car" or \
-               object_content['type'] == "Van" or \
-               object_content['type'] == "Truck" or \
-               object_content['type'] == "Bus":
-                    output_dict.update({object_id: bbx_lidar})
+                    object_content['type'] == "Van" or \
+                    object_content['type'] == "Truck" or \
+                    object_content['type'] == "Bus":
+                output_dict.update({object_id: bbx_lidar})
 
 
-
-
-def load_single_objects_dairv2x_hetero(object_list,
-                          output_dict,
-                          lidar_range,
-                          trans_mat,
-                          order):
+def load_single_objects_dairv2x_hetero(object_list, output_dict, lidar_range, trans_mat, order):
     """
 
     Parameters
@@ -1195,7 +1153,7 @@ def load_single_objects_dairv2x_hetero(object_list,
     """
 
     i = 0
-    for object_content in object_list:        
+    for object_content in object_list:
         object_id = i
         x = object_content['3d_location']['x']
         y = object_content['3d_location']['y']
@@ -1205,12 +1163,12 @@ def load_single_objects_dairv2x_hetero(object_list,
         w = object_content['3d_dimensions']['w']
         rotation = object_content['rotation']
 
-        if isinstance(x, str): # in camera label, xyz are str
+        if isinstance(x, str):  # in camera label, xyz are str
             x = eval(x)
             y = eval(y)
             z = eval(z)
 
-        if l==0 or h ==0 or w==0:
+        if l == 0 or h == 0 or w == 0:
             continue
         i = i + 1
 
@@ -1218,19 +1176,17 @@ def load_single_objects_dairv2x_hetero(object_list,
         lidar_range_z_larger[2] -= 1
         lidar_range_z_larger[5] += 1
 
-        bbx_lidar = [x,y,z,h,w,l,rotation] if order=="hwl" else [x,y,z,l,w,h,rotation] # suppose order is in ['hwl', 'lwh']
-        bbx_lidar = np.array(bbx_lidar).reshape(1,-1) # [1,7]
+        bbx_lidar = [x, y, z, h, w, l, rotation] if order == "hwl" else [x, y, z, l, w, h,
+                                                                         rotation]  # suppose order is in ['hwl', 'lwh']
+        bbx_lidar = np.array(bbx_lidar).reshape(1, -1)  # [1,7]
         bbx_lidar_ego = corner_to_center(
-                            project_box3d(boxes_to_corners_3d(bbx_lidar, order), trans_mat) , order=order)
+            project_box3d(boxes_to_corners_3d(bbx_lidar, order), trans_mat), order=order)
         bbx_lidar_ego = mask_boxes_outside_range_numpy(bbx_lidar_ego, lidar_range_z_larger, order)
 
         if bbx_lidar_ego.shape[0] > 0:
-            if object_content['type'] == "Car" or \
-               object_content['type'] == "Van" or \
-               object_content['type'] == "Truck" or \
-               object_content['type'] == "Bus":
-                    output_dict.update({object_id: bbx_lidar_ego})
-
+            if object_content['type'] == "Car" or object_content['type'] == "Van" or \
+                    object_content['type'] == "Truck" or object_content['type'] == "Bus":
+                output_dict.update({object_id: bbx_lidar_ego})
 
 
 def box_is_visible(bbx_lidar, visibility_map):
@@ -1253,12 +1209,12 @@ def box_is_visible(bbx_lidar, visibility_map):
     visibility_map : np.ndarray
         (256, 256). Non zero is visible.
     """
-    
-    x, y = bbx_lidar[0,:2]
-    
+
+    x, y = bbx_lidar[0, :2]
+
     # rasterize x and y
-    py = 127 - int(x/0.39)
-    px = 127 + int(y/0.39)
+    py = 127 - int(x / 0.39)
+    px = 127 + int(y / 0.39)
 
     if py < 0 or py >= 256 or px < 0 or px >= 256:
         return False
@@ -1266,13 +1222,8 @@ def box_is_visible(bbx_lidar, visibility_map):
     return visibility_map[py, px] > 0
 
 
-def project_world_visible_objects(object_dict,
-                          output_dict,
-                          lidar_pose,
-                          lidar_range,
-                          order,
-                          visibility_map,
-                          enlarge_z = False):
+def project_world_visible_objects(object_dict, output_dict, lidar_pose, lidar_range,
+                                  order, visibility_map, enlarge_z=False):
     """
     It's used by CameraDataset. Filtered by visibility map.
 
@@ -1302,14 +1253,13 @@ def project_world_visible_objects(object_dict,
     for object_id, object_content in object_dict.items():
         location = object_content['location']
         rotation = object_content['angle']
-        center = [0,0,0] if 'center' not in object_content else object_content['center']
+        center = [0, 0, 0] if 'center' not in object_content else object_content['center']
         extent = object_content['extent']
 
         object_pose = [location[0] + center[0],
                        location[1] + center[1],
                        location[2] + center[2],
                        rotation[0], rotation[1], rotation[2]]
-
 
         object2lidar = x1_to_x2(object_pose, lidar_pose)
 
@@ -1328,10 +1278,7 @@ def project_world_visible_objects(object_dict,
             lidar_range_z_larger[5] += 10
             lidar_range = lidar_range_z_larger
 
-        bbx_lidar = mask_boxes_outside_range_numpy(bbx_lidar,
-                                                   lidar_range,
-                                                   order)
+        bbx_lidar = mask_boxes_outside_range_numpy(bbx_lidar, lidar_range, order)
 
         if bbx_lidar.shape[0] > 0 and box_is_visible(bbx_lidar, visibility_map):
             output_dict.update({object_id: bbx_lidar})
-

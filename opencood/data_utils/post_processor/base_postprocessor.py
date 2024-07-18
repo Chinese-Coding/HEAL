@@ -197,7 +197,7 @@ class BasePostprocessor:
             The final target lidar pose with length 6.
 
         enlarge_z :
-            if True, enlarge the z axis range to include more object
+            if True, enlarge (扩大, 扩充) the z axis range to include more object
 
         Returns
         -------
@@ -208,16 +208,23 @@ class BasePostprocessor:
         object_ids : list
             Length is number of bbx in current sample.
         """
+        assert len(cav_contents) == 1
+        assert len(reference_lidar_pose) == 6
         tmp_object_dict = {}
         for cav_content in cav_contents:
             tmp_object_dict.update(cav_content['params']['vehicles'])
 
         output_dict = {}
         filter_range = self.params['anchor_args']['cav_lidar_range'] if self.train else self.params['gt_range']
-
+        # 将 `cav_content['params']['vehicles']` 里面的物体, 按照设置的检测范围, 以及真是世界的坐标进行坐标转换
         box_utils.project_world_objects(tmp_object_dict, output_dict, reference_lidar_pose,
                                         filter_range, self.params['order'], enlarge_z)
-
+        """
+        调试得 `self.params['min_num']` 的值为150, 应该指的是最大的检测目标数
+        如果说 output_dict 的长度大于 150, 不是会出现下标索引错误吗?
+        如果小于, 则有位置的地方 mask 被标记为 1, 通过这个来进行判断.
+        如果固定设置为 150 的话, 普遍少于 150, 根据 mask 判断有无物体
+        """
         object_np = np.zeros((self.params['max_num'], 7))
         mask = np.zeros(self.params['max_num'])
         object_ids = []

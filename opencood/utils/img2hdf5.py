@@ -4,11 +4,11 @@
 
 import os
 from multiprocessing import Process
-import numpy as np
-from tqdm import tqdm
-from PIL import Image
+
 import h5py
-import sys
+import numpy as np
+from PIL import Image
+from tqdm import tqdm
 
 
 def load_camera_data(camera_files, preload=True):
