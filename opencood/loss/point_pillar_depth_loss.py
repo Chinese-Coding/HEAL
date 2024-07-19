@@ -11,12 +11,12 @@ from opencood.loss.point_pillar_loss import PointPillarLoss
 
 logger = get_logger()
 
+
 class PointPillarDepthLoss(PointPillarLoss):
     def __init__(self, args):
         super().__init__(args)
+
         self.depth = args['depth']
-
-
         self.depth_weight = self.depth['weight']
         self.smooth_target = True if 'smooth_target' in self.depth and self.depth['smooth_target'] else False
         self.use_fg_mask = True if 'use_fg_mask' in self.depth and self.depth['use_fg_mask'] else False
@@ -27,7 +27,6 @@ class PointPillarDepthLoss(PointPillarLoss):
         else:
             self.depth_loss_func = FocalLoss(alpha=0.25, gamma=2.0, reduction="none")
 
-
     def forward(self, output_dict, target_dict, suffix=""):
         """
         Parameters
@@ -35,7 +34,6 @@ class PointPillarDepthLoss(PointPillarLoss):
         output_dict : dict
         target_dict : dict
         """
-
         total_loss = super().forward(output_dict, target_dict, suffix)
         all_depth_loss = 0
         depth_items_list = [x for x in output_dict.keys() if x.startswith(f"depth_items{suffix}")]
@@ -47,22 +45,21 @@ class PointPillarDepthLoss(PointPillarLoss):
             # depth gt indices: [N, H, W]
             # fg_mask: [N, H, W]
             depth_logit, depth_gt_indices = depth_item[0], depth_item[1]
-            depth_loss = self.depth_loss_func(depth_logit, depth_gt_indices) 
+            depth_loss = self.depth_loss_func(depth_logit, depth_gt_indices)
             if self.use_fg_mask:
                 fg_mask = depth_item[-1]
                 weight_mask = (fg_mask > 0) * self.fg_weight + (fg_mask == 0) * self.bg_weight
                 depth_loss *= weight_mask
 
-            depth_loss = depth_loss.mean() * self.depth_weight 
+            depth_loss = depth_loss.mean() * self.depth_weight
             all_depth_loss += depth_loss
 
         total_loss += all_depth_loss
-        self.loss_dict.update({'depth_loss': all_depth_loss}) # no update the total loss in dict
-        
+        self.loss_dict.update({'depth_loss': all_depth_loss})  # no update the total loss in dict
+
         return total_loss
 
-
-    def logging(self, epoch, batch_id, batch_len, writer = None, suffix=""):
+    def logging(self, epoch, batch_id, batch_len, writer=None, suffix=""):
         """
         Print out  the loss function for current iteration.
 
@@ -84,27 +81,21 @@ class PointPillarDepthLoss(PointPillarLoss):
         iou_loss = self.loss_dict.get('iou_loss', 0)
         depth_loss = self.loss_dict.get('depth_loss', 0)
 
-
         # print("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
         #       " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f || Depth Loss: %.4f" % (
         #           epoch, batch_id + 1, batch_len, suffix,
         #           total_loss, cls_loss, reg_loss, dir_loss, iou_loss, depth_loss))
         logger.info("[epoch %d][%d/%d]%s || Loss: %.4f || Conf Loss: %.4f"
-              " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f || Depth Loss: %.4f" % (
-                  epoch, batch_id + 1, batch_len, suffix,
-                  total_loss, cls_loss, reg_loss, dir_loss, iou_loss, depth_loss))
+                    " || Loc Loss: %.4f || Dir Loss: %.4f || IoU Loss: %.4f || Depth Loss: %.4f" % (
+                        epoch, batch_id + 1, batch_len, suffix,
+                        total_loss, cls_loss, reg_loss, dir_loss, iou_loss, depth_loss))
 
         if not writer is None:
-            writer.add_scalar('Regression_loss' + suffix, reg_loss,
-                            epoch*batch_len + batch_id)
-            writer.add_scalar('Confidence_loss' + suffix, cls_loss,
-                            epoch*batch_len + batch_id)
-            writer.add_scalar('Dir_loss' + suffix, dir_loss,
-                            epoch*batch_len + batch_id)
-            writer.add_scalar('Iou_loss' + suffix, iou_loss,
-                            epoch*batch_len + batch_id)
-            writer.add_scalar('Depth_loss' + suffix, depth_loss,
-                            epoch*batch_len + batch_id)
+            writer.add_scalar('Regression_loss' + suffix, reg_loss, epoch * batch_len + batch_id)
+            writer.add_scalar('Confidence_loss' + suffix, cls_loss, epoch * batch_len + batch_id)
+            writer.add_scalar('Dir_loss' + suffix, dir_loss, epoch * batch_len + batch_id)
+            writer.add_scalar('Iou_loss' + suffix, iou_loss, epoch * batch_len + batch_id)
+            writer.add_scalar('Depth_loss' + suffix, depth_loss, epoch * batch_len + batch_id)
 
 
 class FocalLoss(nn.Module):
@@ -145,7 +136,7 @@ class FocalLoss(nn.Module):
         >>> output.backward()
     """
 
-    def __init__(self, alpha, gamma = 2.0, reduction= 'none', smooth_target = False , eps = None) -> None:
+    def __init__(self, alpha, gamma=2.0, reduction='none', smooth_target=False, eps=None) -> None:
         super().__init__()
         self.alpha = alpha
         self.gamma = gamma
@@ -153,7 +144,8 @@ class FocalLoss(nn.Module):
         self.smooth_target = smooth_target
         self.eps = eps
         if self.smooth_target:
-            self.smooth_kernel = nn.Conv1d(in_channels=1, out_channels=1, kernel_size=3, stride=1, padding=1, bias=False)
+            self.smooth_kernel = nn.Conv1d(in_channels=1, out_channels=1, kernel_size=3, stride=1, padding=1,
+                                           bias=False)
             self.smooth_kernel.weight = torch.nn.Parameter(torch.tensor([[[0.2, 0.9, 0.2]]]), requires_grad=False)
             self.smooth_kernel = self.smooth_kernel.to(torch.device("cuda"))
 
@@ -168,8 +160,8 @@ class FocalLoss(nn.Module):
         # create the labels one hot tensor
         D = input.shape[1]
         if self.smooth_target:
-            target_one_hot = F.one_hot(target, num_classes=D).to(input).view(-1, D) # [N*H*W, D]
-            target_one_hot = self.smooth_kernel(target_one_hot.float().unsqueeze(1)).squeeze(1) # [N*H*W, D]
+            target_one_hot = F.one_hot(target, num_classes=D).to(input).view(-1, D)  # [N*H*W, D]
+            target_one_hot = self.smooth_kernel(target_one_hot.float().unsqueeze(1)).squeeze(1)  # [N*H*W, D]
             target_one_hot = target_one_hot.view(*target.shape, D).permute(0, 3, 1, 2)
         else:
             target_one_hot = F.one_hot(target, num_classes=D).to(input).permute(0, 3, 1, 2)

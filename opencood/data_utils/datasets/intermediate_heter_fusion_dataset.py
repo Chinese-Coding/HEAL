@@ -17,10 +17,8 @@ from typing import Mapping
 
 import numpy as np
 import torch
-from networkx import ego_graph
 
 from opencood.data_utils.pre_processor import build_preprocessor
-from opencood.tools.inference_utils import get_cav_box
 from opencood.utils import box_utils as box_utils
 from opencood.utils.camera_utils import (
     sample_augmentation,
@@ -286,7 +284,12 @@ def getIntermediateheterFusionDataset(cls):
             return selected_cav_processed
 
         def __getitem__(self, idx):
-            # 根据 idx 获取到某一个场景下全部的 cav, 同时添加噪声, 这一步就模拟了通信
+            """
+            根据 idx 获取到某一个场景下全部的 cav, 同时添加噪声, 这一步就模拟了通信
+            2024.07.19 补充: 好像在这里说完成了通信是不太适合的, 考虑到这是中期融合,
+            而中期融合融合的是 encoder 后的特征. 很明显不符合中期融合的概念.
+            同时, 论文给出的图片上指出, 在 Message Transmission 阶段不止传递 Feature, 也传递 Pose, 也许这里传递的是 Pose?
+            """
             base_data_dict = self.retrieve_base_data(idx)
             base_data_dict = add_noise_data_dict(base_data_dict, self.params['noise_setting'])
 

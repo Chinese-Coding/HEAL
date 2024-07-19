@@ -118,10 +118,10 @@ class HeterPyramidCollab(nn.Module):
 
         """
         Shared Heads
+        TODO: 这些 head 为什么都是全连接层呢?
         """
         self.cls_head = nn.Conv2d(args['in_head'], args['anchor_number'], kernel_size=1)
         self.reg_head = nn.Conv2d(args['in_head'], 7 * args['anchor_number'], kernel_size=1)
-
         # BIN_NUM = 2
         self.dir_head = nn.Conv2d(args['in_head'], args['dir_args']['num_bins'] * args['anchor_number'], kernel_size=1)
 
@@ -163,11 +163,16 @@ class HeterPyramidCollab(nn.Module):
         #  然后两者取交集即可后转换成  list 再进行计算, 然后下面两个就能和在一起了
 
         # 遍历模型的每个模态, 如果有一致的就调用对应模态的层进行训练
+        """
+        TODO: 这部分是不是就相当于 encoder 部分?
+        """
         for modality_name in self.modality_name_list:
             if modality_name not in modality_count_dict:
                 continue
             feature = eval(f"self.encoder_{modality_name}")(data_dict, modality_name)
+            # 每个模态的 backbone 其实都是 ResNetBEVBackbone, 只不过设定上不一致罢了
             feature = eval(f"self.backbone_{modality_name}")({"spatial_features": feature})['spatial_features_2d']
+            # 在进行第一阶段的训练时, 其实是不需要对齐的, 根据配置文件生成的 `aligner_` 也是 nn.Identity()
             feature = eval(f"self.aligner_{modality_name}")(feature)
             # 提取到每个模态的 feature, 并将其放到 `modality_feature_dict` 供下一步操作
             modality_feature_dict[modality_name] = feature
@@ -204,6 +209,13 @@ class HeterPyramidCollab(nn.Module):
 
         """
         Assemble heter features
+        整合特征, 首先讲每种模态下车的数量初始化为 0, 之后遍历该场景中模态列表 (场景中每个车对应一种模态)
+        将 modality_feature_dict 中的特征, 按照对应的模态和下标提取出来
+        
+        如果自己写的话: 外循环从 m1 遍历到 m5, 内循环, 遍历对应的 modality_feature_dict[modality_name]
+        但是这样不保证, 车和特征的对应关系, 例如: 一共有三辆车, 其模态分别为: 1: m1, 2: m2, 3: m1
+        按照我的写法的话, 整合后的特征顺序应为: 1, 3, 2, 没法和 `agent_modality_list` 对应.
+        这一部分是不是就是完成了 中期融合中的 Feature 融合?
         """
         counting_dict = {modality_name: 0 for modality_name in self.modality_name_list}
         heter_feature_2d_list = []
@@ -212,7 +224,7 @@ class HeterPyramidCollab(nn.Module):
             heter_feature_2d_list.append(modality_feature_dict[modality_name][feat_idx])
             counting_dict[modality_name] += 1
 
-        heter_feature_2d = torch.stack(heter_feature_2d_list)
+        heter_feature_2d = torch.stack(heter_feature_2d_list)  # 将一个 list[Tensor] 通过增加一个维度变为 Tensor
 
         if self.compress:
             heter_feature_2d = self.compressor(heter_feature_2d)
@@ -230,9 +242,7 @@ class HeterPyramidCollab(nn.Module):
         reg_preds = self.reg_head(fused_feature)
         dir_preds = self.dir_head(fused_feature)
 
-        output_dict.update({'cls_preds': cls_preds,
-                            'reg_preds': reg_preds,
-                            'dir_preds': dir_preds})
+        output_dict.update({'cls_preds': cls_preds, 'reg_preds': reg_preds, 'dir_preds': dir_preds})
 
         output_dict.update({'occ_single_list': occ_outputs})
 

@@ -31,12 +31,13 @@ class PointPillar(nn.Module):
         self.scatter = PointPillarScatter(args['point_pillar_scatter'])
 
     def forward(self, data_dict: Mapping, modality_name: str) -> List[Tensor]:
-        voxel_features = data_dict[f'inputs_{modality_name}']['voxel_features']
-        voxel_coords = data_dict[f'inputs_{modality_name}']['voxel_coords']
-        voxel_num_points = data_dict[f'inputs_{modality_name}']['voxel_num_points']
+        # 在 dataset 部分, 就将点云转换为了体素
+        voxel_features = data_dict[f'inputs_{modality_name}']['voxel_features']  # 调试得: shape: [42141, 32, 4]
+        voxel_coords = data_dict[f'inputs_{modality_name}']['voxel_coords']  # 调试得: shape: [42141, 4]
+        voxel_num_points = data_dict[f'inputs_{modality_name}']['voxel_num_points']  # 42141
 
-        pillar_features = self.pillar_vfe(voxel_features, voxel_num_points, voxel_coords)
-        return self.scatter(pillar_features, voxel_coords)
+        pillar_features = self.pillar_vfe(voxel_features, voxel_num_points, voxel_coords)  # 提取到的体素特征 调试的: [42141, 64]
+        return self.scatter(pillar_features, voxel_coords)  # 调试得: [6, 64, 256, 512]
 
         # TODO: 这里可能有 bug
         # batch_dict = {'voxel_features': voxel_features,

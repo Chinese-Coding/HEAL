@@ -42,10 +42,7 @@ class PointPillarPyramidLoss(PointPillarDepthLoss):
         occ_loss = self.calc_occ_loss(occ_single_list, target_dict['pos_equal_one'], target_dict['neg_equal_one'],
                                       batch_size)
         total_loss += occ_loss
-        self.loss_dict.update({
-            'pyramid_loss': occ_loss.item(),
-            'total_loss': total_loss.item()
-        })
+        self.loss_dict.update({'pyramid_loss': occ_loss.item(), 'total_loss': total_loss.item()})
         return total_loss
 
     def forward_collab(self, output_dict, target_dict, suffix):
@@ -63,10 +60,7 @@ class PointPillarPyramidLoss(PointPillarDepthLoss):
         occ_single_list = output_dict['occ_single_list']
         occ_loss = self.calc_occ_loss(occ_single_list, positives, negatives, batch_size)
         total_loss = occ_loss
-        self.loss_dict = {
-            'pyramid_loss': occ_loss.item(),
-            'total_loss': total_loss.item()
-        }
+        self.loss_dict = {'pyramid_loss': occ_loss.item(), 'total_loss': total_loss.item()}
 
         return total_loss
 
@@ -95,8 +89,7 @@ class PointPillarPyramidLoss(PointPillarDepthLoss):
 
             pos_normalizer = positives_level.sum(1, keepdim=True).float()
 
-            occ_preds = occ_preds_single.permute(0, 2, 3, 1).contiguous() \
-                .view(batch_size, -1, 1)
+            occ_preds = occ_preds_single.permute(0, 2, 3, 1).contiguous().view(batch_size, -1, 1)
             occ_weights = positives_level * self.pos_cls_weight + negatives_level * 1.0
             occ_weights /= torch.clamp(pos_normalizer, min=1.0)
             occ_loss = sigmoid_focal_loss(occ_preds, occ_labls, weights=occ_weights, **self.cls)
@@ -147,8 +140,6 @@ class PointPillarPyramidLoss(PointPillarDepthLoss):
             writer.add_scalar('Depth_loss' + suffix, depth_loss, epoch * batch_len + batch_id)
             writer.add_scalar('Pyramid_loss' + suffix, pyramid_loss, epoch * batch_len + batch_id)
 
-        return {
-            'Loss': total_loss, 'Conf Loss': cls_loss, 'Loc Loss': reg_loss,
-            'Dir Loss': dir_loss, 'IoU Loss': iou_loss, 'Depth Loss': depth_loss,
-            'Pyramid Loss': pyramid_loss
-        }
+        return {'Loss': total_loss, 'Conf Loss': cls_loss, 'Loc Loss': reg_loss, 'Dir Loss': dir_loss,
+                'IoU Loss': iou_loss, 'Depth Loss': depth_loss, 'Pyramid Loss': pyramid_loss
+                }

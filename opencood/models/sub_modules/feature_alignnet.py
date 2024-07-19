@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
+from typing import Mapping
 
 import torch.nn as nn
 
@@ -9,7 +10,7 @@ from opencood.models.sub_modules.feature_alignnet_modules import SCAligner, Res1
 
 
 class AlignNet(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args: Mapping):
         super().__init__()
         model_name = args['core_method']
         # TODO: 这里换成 map 的写法会不会更好?

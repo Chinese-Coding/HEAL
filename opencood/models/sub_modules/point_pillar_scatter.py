@@ -18,7 +18,7 @@ class PointPillarScatter(nn.Module):
         assert self.nz == 1
 
     # def forward(self, batch_dict: Mapping):
-    def forward(self, pillar_features: Tensor, coords: Tensor) -> List[Tensor]:
+    def forward(self, pillar_features: Tensor, coords: Tensor) -> Tensor:
         """
         将生成的pillar按照坐标索引还原到原空间中
         Args:
