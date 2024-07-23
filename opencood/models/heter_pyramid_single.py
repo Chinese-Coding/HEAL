@@ -74,6 +74,7 @@ class HeterPyramidSingle(nn.Module):
                 setattr(self, f"crop_ratio_H_{modality_name}",
                         (self.cav_range[4]) / (camera_mask_args['grid_conf']['ybound'][1]))
 
+                # TODO: 相对于 collab, 这里少了不少代码
             setattr(self, f"aligner_{modality_name}", AlignNet(model_setting['aligner_args']))
 
             if args.get("fix_encoder", False):
@@ -90,7 +91,7 @@ class HeterPyramidSingle(nn.Module):
         if 'shrink_header' in args:
             self.shrink_flag = True
             self.shrink_conv = DownsampleConv(args['shrink_header'])
-            self.fix_modules.append('shrink_conv')
+            self.fix_modules.append('shrink_conv')  # TODO: 相对于 collab 这里为什么多了这么一部分内容?
 
         """
         Shared Heads, Would load from pretrain base.
@@ -113,6 +114,9 @@ class HeterPyramidSingle(nn.Module):
 
     def forward(self, data_dict):
         output_dict = {'pyramid': 'single'}
+
+        # TODO: 相对于 collab 这里少了一部分内容
+
         modality_name = [x for x in list(data_dict.keys()) if x.startswith("inputs_")]
         assert len(modality_name) == 1
         modality_name = modality_name[0].lstrip('inputs_')
@@ -130,9 +134,7 @@ class HeterPyramidSingle(nn.Module):
             )(feature)
 
             if eval(f"self.depth_supervision_{modality_name}"):
-                output_dict.update({
-                    f"depth_items_{modality_name}": eval(f"self.encoder_{modality_name}").depth_items
-                })
+                output_dict.update({f"depth_items_{modality_name}": eval(f"self.encoder_{modality_name}").depth_items})
 
         # multiscale fusion. 
         feature, occ_map_list = self.pyramid_backbone.forward_single(feature)
@@ -144,9 +146,6 @@ class HeterPyramidSingle(nn.Module):
         reg_preds = self.reg_head(feature)
         dir_preds = self.dir_head(feature)
 
-        output_dict.update({'cls_preds': cls_preds,
-                            'reg_preds': reg_preds,
-                            'dir_preds': dir_preds})
-        output_dict.update({'occ_single_list':
-                                occ_map_list})
+        output_dict.update({'cls_preds': cls_preds, 'reg_preds': reg_preds, 'dir_preds': dir_preds})
+        output_dict.update({'occ_single_list': occ_map_list})
         return output_dict

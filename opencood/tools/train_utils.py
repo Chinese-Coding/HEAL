@@ -194,7 +194,7 @@ def create_model(hypes: Mapping) -> nn.Module:
     return instance
 
 
-def create_model(backbone_name: str, backbone_config: Mapping) -> nn.Module:
+def _create_model(backbone_name: str, backbone_config: Mapping) -> nn.Module:
     try:
         model = backbones[backbone_name]
     except KeyError:

@@ -139,8 +139,7 @@ class HeterPyramidCollab(nn.Module):
     def model_train_init(self):
         if not self.compress:
             return
-        # if compress, only make compressor trainable
-        # freeze all
+        # if compress, only make compressor trainable freeze all
         self.eval()
         for p in self.parameters():
             p.requires_grad_(False)

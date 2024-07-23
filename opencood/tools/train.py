@@ -8,13 +8,12 @@ import statistics
 from datetime import datetime
 
 import torch
-from click.core import batch
 from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import opencood.hypes_yaml.yaml_utils as yaml_utils
-from opencood.data_utils.datasets import build_dataset
+from opencood.data_utils.datasets import build_dataset, _build_dataset
 from opencood.logger import get_logger
 from opencood.tools import train_utils
 
@@ -41,22 +40,26 @@ def main():
     # train_dataset = build_dataset(hypes, visualize=False, train=True)
     # validate_dataset = build_dataset(hypes, visualize=False, train=False)
 
-    train_dataset = build_dataset(hypes['fusion']['core_method'], hypes['fusion']['dataset'], hypes, False, True)
-    validate_dataset = build_dataset(hypes['fusion']['core_method'], hypes['fusion']['dataset'], hypes, False, False)
+    train_dataset = _build_dataset(hypes['fusion']['core_method'], hypes['fusion']['dataset'], hypes, False, True)
+    validate_dataset = _build_dataset(hypes['fusion']['core_method'], hypes['fusion']['dataset'], hypes, False, False)
 
     logger.success(f'训练数据集类型: {type(train_dataset)}')
     logger.success(f'验证数据集类型: {type(validate_dataset)}')
 
+    """
+    在 PyTorch 的 DataLoader 中，collate_fn 参数用于定义如何将一个 batch 的样本组合在一起。
+    通常情况下，DataLoader 会自动将一个 batch 中的样本堆叠成张量（tensor），但在某些情况下，可能需要自定义这种组合方式。这时，collate_fn 就显得非常有用。
+    """
     train_loader = DataLoader(train_dataset, batch_size=hypes['train_params']['batch_size'],
-                              num_workers=4, collate_fn=train_dataset.collate_batch_train,
+                              num_workers=1, collate_fn=train_dataset.collate_batch_train,
                               shuffle=False, pin_memory=True, drop_last=True, prefetch_factor=2)
 
     val_loader = DataLoader(validate_dataset, batch_size=hypes['train_params']['batch_size'],
-                            num_workers=4, collate_fn=train_dataset.collate_batch_train,
+                            num_workers=1, collate_fn=train_dataset.collate_batch_train,
                             shuffle=False, pin_memory=True, drop_last=True, prefetch_factor=2)
     logger.success('数据集加载完毕, 开始创建模型')
 
-    model = train_utils.create_model(hypes['model']['core_method'], hypes['model']['args'])
+    model = train_utils._create_model(hypes['model']['core_method'], hypes['model']['args'])
 
     # record lowest validation loss checkpoint.
     lowest_val_loss = 1e5
@@ -127,6 +130,7 @@ def main():
         train_loader_len = len(train_loader)
         pbar = tqdm(enumerate(train_loader), total=train_loader_len, desc=f"Epoch {epoch}")
         for i, batch_data in pbar:
+            # TODO: 为什么这里需要加一个关于 object_bbx_mask 的判断?
             if batch_data is None or batch_data['ego']['object_bbx_mask'].sum() == 0:
                 continue
 
@@ -140,8 +144,8 @@ def main():
             loss_dict = criterion.logging(epoch, i, train_loader_len, writer)
 
             if supervise_single_flag:
-                final_loss += criterion(output_dict, batch_data['ego']['label_dict_single'], suffix="_single") * hypes[
-                    'train_params'].get("single_weight", 1)
+                final_loss += (criterion(output_dict, batch_data['ego']['label_dict_single'], suffix="_single") *
+                               hypes['train_params'].get("single_weight", 1))
                 loss_dict = criterion.logging(epoch, i, train_loader_len, writer, suffix="_single")
 
             # Update progress bar with current loss
@@ -157,8 +161,12 @@ def main():
 
         if epoch % hypes['train_params']['eval_freq'] == 0:
             logger.success('开始计算损失')
-            valid_ave_loss = []
-
+            valid_ave_losses = []
+            """
+            with torch.no_grad(): 是 PyTorch 中的一个上下文管理器，用于在某个代码块中暂时关闭自动求导机制。
+            具体来说，它的作用是确保在这个代码块中的所有操作都不会记录梯度信息，从而节省显存和计算资源。
+            这在进行模型推理（inference）或评估（evaluation）时特别有用，因为在这些情况下不需要计算梯度。
+            """
             with torch.no_grad():
                 pbar = tqdm(enumerate(val_loader), total=len(val_loader), desc='Validation Loss')
                 for i, batch_data in pbar:
@@ -174,20 +182,19 @@ def main():
 
                     final_loss = criterion(output_dict, batch_data['ego']['label_dict'])
                     logger.info(f'val loss {final_loss:.3f}')
-                    valid_ave_loss.append(final_loss.item())
+                    valid_ave_losses.append(final_loss.item())
 
                     # Update progress bar with current loss
                     pbar.set_postfix({'loss': f'{final_loss:.3f}'})
 
-            valid_ave_loss = statistics.mean(valid_ave_loss)
-            logger.success(f'At epoch {epoch}, the validation loss is {valid_ave_loss}')
+            valid_ave_loss = statistics.mean(valid_ave_losses)
+            logger.success(f'At epoch {epoch}, the averaged validation loss is {valid_ave_loss}')
             writer.add_scalar('Validate_Loss', valid_ave_loss, epoch)
 
             # lowest val loss
-            if valid_ave_loss < lowest_val_loss:
+            if valid_ave_loss < lowest_val_loss:  # 如果这一轮的损失精度小于之前的最小的损失精度, 那么就保存当前的训练结果为最好的训练结果
                 lowest_val_loss = valid_ave_loss
-                torch.save(model.state_dict(),
-                           os.path.join(saved_path, 'net_epoch_bestval_at%d.pth' % (epoch + 1)))
+                torch.save(model.state_dict(), os.path.join(saved_path, 'net_epoch_bestval_at%d.pth' % (epoch + 1)))
                 if (lowest_val_epoch != -1 and
                         os.path.exists(os.path.join(saved_path, 'net_epoch_bestval_at%d.pth' % lowest_val_epoch))):
                     os.remove(os.path.join(saved_path, 'net_epoch_bestval_at%d.pth' % lowest_val_epoch))

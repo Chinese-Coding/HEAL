@@ -142,9 +142,7 @@ def inference_early_fusion(batch_data, model, dataset):
 
     pred_box_tensor, pred_score, gt_box_tensor = dataset.post_process(batch_data, output_dict)
 
-    return_dict = {"pred_box_tensor": pred_box_tensor,
-                   "pred_score": pred_score,
-                   "gt_box_tensor": gt_box_tensor}
+    return_dict = {"pred_box_tensor": pred_box_tensor, "pred_score": pred_score, "gt_box_tensor": gt_box_tensor}
     if "depth_items" in output_dict['ego']:
         return_dict.update({"depth_items": output_dict['ego']['depth_items']})
     return return_dict
@@ -152,7 +150,7 @@ def inference_early_fusion(batch_data, model, dataset):
 
 def inference_intermediate_fusion(batch_data, model, dataset):
     """
-    Model inference for early fusion.
+    Model inference for early fusion. TODO: early ? 这个函数不是为 intermediate 写的吗?
 
     Parameters
     ----------

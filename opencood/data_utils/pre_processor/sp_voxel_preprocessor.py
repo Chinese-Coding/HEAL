@@ -35,7 +35,7 @@ class SpVoxelPreprocessor(BasePreprocessor):
             self.max_voxels = self.params['args']['max_voxel_train']
         else:
             self.max_voxels = self.params['args']['max_voxel_test']
-        # 调试：[512, 2561 1.]
+        # 调试：[512. 2561 1.], m2: [256. 256.  1.]
         grid_size = (np.array(self.lidar_range[3:6]) - np.array(self.lidar_range[0:3])) / np.array(self.voxel_size)
         self.grid_size = np.round(grid_size).astype(np.int64)
 

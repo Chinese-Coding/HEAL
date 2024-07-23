@@ -6,8 +6,7 @@ License: TDG-Attribution-NonCommercial-NoDistrib
 intermediate heter fusion dataset
 
 Note that for DAIR-V2X dataset,
-Each agent should retrieve the objects itself, and merge them by iou,
-instead of using the cooperative label.
+Each agent should retrieve the objects itself, and merge them by iou, instead of using the cooperative label.
 """
 
 import copy
@@ -494,7 +493,7 @@ def getIntermediateheterFusionDataset(cls):
                 if self.sensor_type_dict[modality_name] == "lidar":
                     # merged_feature_dict = merge_features_to_dict(eval(f"input_list_{modality_name}"))
                     """
-                    一开始 input_list_dict 按照 cav_id 的数量分别存储着 'voxel_coords', 'voxel_coords', 'voxel_num_points'
+                    一开始 input_list_dict 按照 cav_id 的数量分别存储着 'voxel_features', 'voxel_coords', 'voxel_num_points'
                     经过这个函数后, 上述三个键分别存储着 cav_id 中的对应数据
                     """
                     merged_feature_dict = merge_features_to_dict(input_list_dict[f"input_list_{modality_name}"])
@@ -532,7 +531,14 @@ def getIntermediateheterFusionDataset(cls):
                                                             mask=mask)
             """
             TODO: 最后返回的给模型的数据, 包含以下内容
+            TODO: 最后返回的给模型的数据, 包含以下内容
             里面的许多参数我都见过许多类似的, 内容经过更新
+            是否里面的每个参数都用到了呢?
+            """
+            """
+            在 m1_base 部分, 注释掉 `'anchor_box'` 后仍可正常运行 (可以训练和验证, 但是最后的推理情不得而知). 看代码的话 m1_base 只使用了 voxel (体素) 有关的部分, 是否有这个影响应该不大,
+            如果这样说的话, 那么这些框是否都和 m1_base 的训练无关, 也都可以去掉? 但是其他的呢? 比如说 m2_base 的呢?
+            去掉 `'anchor_box'`后, 推理不可以正常跑,
             """
             processed_data_dict['ego'].update({
                 'object_bbx_center': object_bbx_center,
@@ -685,17 +691,23 @@ def getIntermediateheterFusionDataset(cls):
             label_torch_dict['pairwise_t_matrix'] = pairwise_t_matrix
             label_torch_dict['record_len'] = record_len
 
-            # object id is only used during inference, where batch size is 1.
-            # so here we only get the first element.
-            output_dict['ego'].update({'object_bbx_center': object_bbx_center,
-                                       'object_bbx_mask': object_bbx_mask,
-                                       'record_len': record_len,
-                                       'label_dict': label_torch_dict,
-                                       'object_ids': object_ids[0],
-                                       'pairwise_t_matrix': pairwise_t_matrix,
-                                       'lidar_pose_clean': lidar_pose_clean,
-                                       'lidar_pose': lidar_pose,
-                                       'anchor_box': self.anchor_box_torch})
+            # object id is only used during inference, where batch size is 1. so here we only get the first element.
+            """
+            在这里去掉 `'object_bbx_center'` 和 `'object_ids'` 以及 `'anchor_box'` 后确实还可以训练, 但是训练速度仿佛变慢了
+            epoch 0: 3.s/it, 现在 (epoch 1)是 1.s/it 
+            全部加上以后速度好像也没差多少......
+            """
+            output_dict['ego'].update({
+                'object_bbx_center': object_bbx_center,
+                'object_bbx_mask': object_bbx_mask,
+                'record_len': record_len,
+                'label_dict': label_torch_dict,
+                'object_ids': object_ids[0],
+                'pairwise_t_matrix': pairwise_t_matrix,
+                'lidar_pose_clean': lidar_pose_clean,
+                'lidar_pose': lidar_pose,
+                'anchor_box': self.anchor_box_torch
+            })
 
             if self.visualize:
                 origin_lidar = np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar))
@@ -740,16 +752,13 @@ def getIntermediateheterFusionDataset(cls):
 
             # check if anchor box in the batch
             if batch[0]['ego']['anchor_box'] is not None:
-                output_dict['ego'].update({'anchor_box':
-                                               self.anchor_box_torch})
+                output_dict['ego'].update({'anchor_box': self.anchor_box_torch})
 
             # save the transformation matrix (4, 4) to ego vehicle
             # transformation is only used in post process (no use.)
             # we all predict boxes in ego coord.
-            transformation_matrix_torch = \
-                torch.from_numpy(np.identity(4)).float()
-            transformation_matrix_clean_torch = \
-                torch.from_numpy(np.identity(4)).float()
+            transformation_matrix_torch = torch.from_numpy(np.identity(4)).float()
+            transformation_matrix_clean_torch = torch.from_numpy(np.identity(4)).float()
 
             output_dict['ego'].update({'transformation_matrix': transformation_matrix_torch,
                                        'transformation_matrix_clean': transformation_matrix_clean_torch})

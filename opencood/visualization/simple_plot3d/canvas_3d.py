@@ -5,11 +5,10 @@ Simple 3D visualization for 3D points & boxes. Intended as a simple, hackable
 alternative to mayavi for certain point cloud tasks.
 """
 
-import numpy as np
 import cv2
-import copy
-from functools import partial
 import matplotlib
+import numpy as np
+
 
 class Canvas_3D(object):
     def __init__(self,

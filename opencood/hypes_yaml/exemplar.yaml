@@ -5,14 +5,14 @@ test_dir: "dataset/OPV2V/test" # data directory for testing data
 
 yaml_parser: "load_general_params" # suitable for most cases
 train_params:
-  batch_size: &batch_size 1
+  batch_size: 1
   epoches: 50
   eval_freq: 2 # evaluate every 2 epoches
   save_freq: 2 # save every 2 epoches
   max_cav: 5 # max agent number in a scene
 
 comm_range: 70
-input_source: ['lidar', 'camera', 'depth'] 
+input_source: [ 'lidar', 'camera', 'depth' ]
 # according to your modality setting, you choose data for loading
 # 'depth' is only viable with OPV2V-H dataset
 # 'camera' is not viable with V2X-Sim dataset
@@ -24,14 +24,14 @@ label_type: 'lidar' # 'lidar' or 'camera'.
 # agent will all adopt 'lidar' label in testing.
 
 
-cav_lidar_range: &cav_lidar [-102.4, -102.4, -3, 102.4, 102.4, 1] # [xmin, ymin, zmin, xmax, ymax, zmax]
+cav_lidar_range: &cav_lidar [ -102.4, -102.4, -3, 102.4, 102.4, 1 ] # [xmin, ymin, zmin, xmax, ymax, zmax]
 
-add_data_extension: ['bev_visibility.png'] # additional data extension for loading. ['bev_visibility.png'] for camera API.
+add_data_extension: [ 'bev_visibility.png' ] # additional data extension for loading. ['bev_visibility.png'] for camera API.
 
 
 heter: # heterogenous setting
-  assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
-  ego_modality: &ego_modality "m1&m2&m3&m4" # agent types that are allowed to become ego, separated by '&'.
+  assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json"
+  ego_modality: "m1&m2&m3&m4" # agent types that are allowed to become ego, separated by '&'.
   lidar_channels_dict: # lidar channels for each agent type. If omitted, 64-channel lidar data are used for OPV2V.
     m3: 32
   mapping_dict: # Use the following dictionary to map the agent type set in ‘assignment_path’ to the agent type actually assigned in experiment.
@@ -48,7 +48,7 @@ heter: # heterogenous setting
       preprocess:
         core_method: 'SpVoxelPreprocessor'
         args:
-          voxel_size: &voxel_size [0.4, 0.4, 4]
+          voxel_size: &voxel_size [ 0.4, 0.4, 4 ]
           max_points_per_voxel: 32
           max_voxel_train: 32000
           max_voxel_test: 70000
@@ -59,20 +59,20 @@ heter: # heterogenous setting
       core_method: &core_method_m2 "lift_splat_shoot"
 
       grid_conf: &grid_conf_m2
-        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
-        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
-        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
-        ddiscr: [2, 50, 48]
+        xbound: [ -51.2, 51.2, 0.4 ]   # Limit the range of the x direction and divide the grids
+        ybound: [ -51.2, 51.2, 0.4 ]   # Limit the range of the y direction and divide the grids
+        zbound: [ -10, 10, 20.0 ]   # Limit the range of the z direction and divide the grids
+        ddiscr: [ 2, 50, 48 ]
         mode: 'LID'
       data_aug_conf: &data_aug_conf_m2
-        resize_lim: [0.65, 0.7]
-        final_dim: [384, 512]
-        rot_lim: [-3.6, 3.6]
+        resize_lim: [ 0.65, 0.7 ]
+        final_dim: [ 384, 512 ]
+        rot_lim: [ -3.6, 3.6 ]
         H: 600
         W: 800
         rand_flip: False
-        bot_pct_lim: [0.0, 0.05]
-        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        bot_pct_lim: [ 0.0, 0.05 ]
+        cams: [ 'camera0', 'camera1', 'camera2', 'camera3' ]
         Ncams: 4
 
     m3:
@@ -84,7 +84,7 @@ heter: # heterogenous setting
         # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
         core_method: 'SpVoxelPreprocessor'
         args:
-          voxel_size: &voxel_size_m3 [0.1, 0.1, 0.1]
+          voxel_size: &voxel_size_m3 [ 0.1, 0.1, 0.1 ]
           max_points_per_voxel: 5
           max_voxel_train: 32000
           max_voxel_test: 70000
@@ -96,29 +96,29 @@ heter: # heterogenous setting
       core_method: &core_method_m4 "lift_splat_shoot"
 
       grid_conf: &grid_conf_m4
-        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
-        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
-        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
-        ddiscr: [2, 50, 48]
+        xbound: [ -51.2, 51.2, 0.4 ]   # Limit the range of the x direction and divide the grids
+        ybound: [ -51.2, 51.2, 0.4 ]   # Limit the range of the y direction and divide the grids
+        zbound: [ -10, 10, 20.0 ]   # Limit the range of the z direction and divide the grids
+        ddiscr: [ 2, 50, 48 ]
         mode: 'LID'
       data_aug_conf: &data_aug_conf_m4
-        resize_lim: [0.56, 0.61]
-        final_dim: [336, 448]
-        rot_lim: [-3.6, 3.6]
+        resize_lim: [ 0.56, 0.61 ]
+        final_dim: [ 336, 448 ]
+        rot_lim: [ -3.6, 3.6 ]
         H: 600
         W: 800
         rand_flip: False
-        bot_pct_lim: [0.0, 0.05]
-        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        bot_pct_lim: [ 0.0, 0.05 ]
+        cams: [ 'camera0', 'camera1', 'camera2', 'camera3' ]
         Ncams: 4
 
 fusion:
-  core_method: 'intermediateheter' 
+  core_method: 'intermediateheter'
   # if 'heter' in yaml, 'intermediateheter' or 'lateheter' is supported
   # if 'heter' not in yaml, 'intermediate', 'late' or 'early' is supported. 
   #     See those (old-style but also compatible) yaml in CoAlign's repo: https://github.com/yifanlu0227/CoAlign
   dataset: 'opv2v' # or 'v2xset', 'v2xsim', 'dairv2x'
-  args: 
+  args:
     proj_first: false # 'false' is one-round communciation. 'true' is two-round communication sending pose first (I think it's very unpractical) 
     grid_conf: None # place-holder
     data_aug_conf: None # place-holder
@@ -128,7 +128,7 @@ preprocess:
   # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
   core_method: 'SpVoxelPreprocessor'
   args:
-    voxel_size: [0.4, 0.4, 4] # useful
+    voxel_size: [ 0.4, 0.4, 4 ] # useful
     max_points_per_voxel: 1 # place-holder
     max_voxel_train: 1 # place-holder
     max_voxel_test: 1 # place-holder
@@ -144,7 +144,7 @@ postprocess:
     l: 3.9
     w: 1.6
     h: 1.56
-    r: &anchor_yaw [0, 90]
+    r: &anchor_yaw [ 0, 90 ]
     feature_stride: 2
     num: &anchor_num 2
   target_args:
@@ -182,15 +182,15 @@ model:
           use_norm: true
           with_distance: false
           use_absolute_xyz: true
-          num_filters: [64]
+          num_filters: [ 64 ]
         point_pillar_scatter:
           num_features: 64
 
       backbone_args:
-        layer_nums: [3]
-        layer_strides: [2]
-        num_filters: [64]
-  
+        layer_nums: [ 3 ]
+        layer_strides: [ 2 ]
+        num_filters: [ 64 ]
+
       aligner_args: # see opencood/models/sub_modules/feature_alignnet.py
         core_method: identity
 
@@ -213,9 +213,9 @@ model:
         grid_conf: *grid_conf_m2
 
       backbone_args:
-        layer_nums: [3]
-        layer_strides: [2]
-        num_filters: [64]
+        layer_nums: [ 3 ]
+        layer_strides: [ 2 ]
+        num_filters: [ 64 ]
         inplanes: 128
 
       aligner_args:
@@ -237,9 +237,9 @@ model:
           feature_num: 128
 
       backbone_args:
-        layer_nums: [3]
-        layer_strides: [1]
-        num_filters: [64]
+        layer_nums: [ 3 ]
+        layer_strides: [ 1 ]
+        num_filters: [ 64 ]
         inplanes: 128
       
       aligner_args:
@@ -264,24 +264,24 @@ model:
         grid_conf: *grid_conf_m4
 
       backbone_args:
-        layer_nums: [3]
-        layer_strides: [2]
-        num_filters: [64]
+        layer_nums: [ 3 ]
+        layer_strides: [ 2 ]
+        num_filters: [ 64 ]
         inplanes: 128
-        
+
       aligner_args:
         core_method: identity
 
-    fusion_backbone: 
+    fusion_backbone:
       resnext: true
-      layer_nums: [3, 5, 8]
-      layer_strides: [1, 2, 2]
-      num_filters: [64, 128, 256]
-      upsample_strides: [1, 2, 4]
-      num_upsample_filter: [128, 128, 128]
+      layer_nums: [ 3, 5, 8 ]
+      layer_strides: [ 1, 2, 2 ]
+      num_filters: [ 64, 128, 256 ]
+      upsample_strides: [ 1, 2, 4 ]
+      num_upsample_filter: [ 128, 128, 128 ]
       anchor_number: *anchor_num
 
-    shrink_header: 
+    shrink_header:
       kernal_size: [ 3 ]
       stride: [ 1 ]
       padding: [ 1 ]
@@ -314,8 +314,8 @@ loss:
     depth:
       weight: 1.0
     pyramid: # foreground loss
-      relative_downsample: [1, 2, 4]
-      weight: [0.4, 0.2, 0.1]
+      relative_downsample: [ 1, 2, 4 ]
+      weight: [ 0.4, 0.2, 0.1 ]
 
 
 optimizer:
@@ -328,5 +328,5 @@ optimizer:
 lr_scheduler:
   core_method: multistep #step, multistep and Exponential support
   gamma: 0.1
-  step_size: [15, 30]
+  step_size: [ 15, 30 ]
 

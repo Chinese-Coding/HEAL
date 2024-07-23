@@ -55,7 +55,7 @@ available_base_dataset = {
 logger = get_logger()
 
 
-def build_dataset(fusion_name: str, dataset_name: str, dataset_cfg: Mapping, visualize=False, train=True):
+def _build_dataset(fusion_name: str, dataset_name: str, dataset_cfg: Mapping, visualize=False, train=True):
     try:
         fusion_dataset = available_fusion_dataset[fusion_name]
     except KeyError:

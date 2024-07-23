@@ -57,9 +57,7 @@ def main():
 
         # replace all appearance
         hypes = update_dict(hypes, {
-            "cav_lidar_range": new_cav_range,
-            "lidar_range": new_cav_range,
-            "gt_range": new_cav_range
+            "cav_lidar_range": new_cav_range, "lidar_range": new_cav_range, "gt_range": new_cav_range
         })
 
         # reload anchor
@@ -106,7 +104,7 @@ def main():
     opencood_dataset = build_dataset(hypes, visualize=True, train=False)
     # opencood_dataset_subset = Subset(opencood_dataset, range(640,2100))
     # data_loader = DataLoader(opencood_dataset_subset,
-    data_loader = DataLoader(opencood_dataset, batch_size=1, num_workers=4,
+    data_loader = DataLoader(opencood_dataset, batch_size=1, num_workers=1,
                              collate_fn=opencood_dataset.collate_batch_test, shuffle=False,
                              pin_memory=False, drop_last=False)
 

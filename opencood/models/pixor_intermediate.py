@@ -14,9 +14,7 @@ from opencood.models.pixor import Bottleneck, BackBone, Header
 class BackBoneIntermediate(BackBone):
 
     def __init__(self, block, num_block, geom, use_bn=True):
-        super(BackBoneIntermediate, self).__init__(block,
-                                                   num_block,
-                                                   geom, use_bn)
+        super(BackBoneIntermediate, self).__init__(block, num_block, geom, use_bn)
 
         self.fusion_net3 = AttFusion(192)
         self.fusion_net4 = AttFusion(256)
@@ -59,9 +57,7 @@ class PIXORIntermediate(nn.Module):
         super(PIXORIntermediate, self).__init__()
         geom = args["geometry_param"]
         use_bn = args["use_bn"]
-        self.backbone = BackBoneIntermediate(Bottleneck, [3, 6, 6, 3],
-                                             geom,
-                                             use_bn)
+        self.backbone = BackBoneIntermediate(Bottleneck, [3, 6, 6, 3], geom, use_bn)
         self.header = Header(use_bn)
 
         for m in self.modules():

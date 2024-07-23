@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
-from typing import AnyStr, Mapping, NoReturn, List
+from typing import Mapping, NoReturn, List
 
 import numpy as np
 import torch
@@ -77,7 +77,7 @@ class SECOND(nn.Module):
 
 
 class LiftSplatShoot(nn.Module):
-    def __init__(self, args):
+    def __init__(self, args: Mapping):
         super().__init__()
         self.grid_conf = args['grid_conf']  # 网格配置参数
         self.data_aug_conf = args['data_aug_conf']  # 数据增强配置参数

@@ -4,8 +4,7 @@
 
 
 """
-Convert lidar to voxel. This class was manually designed, and we recommend
-to use sp_voxel_preprocessor.
+Convert lidar to voxel. This class was manually designed, and we recommend to use sp_voxel_preprocessor.
 """
 import sys
 
@@ -43,10 +42,8 @@ class VoxelPreprocessor(BasePreprocessor):
 
         # calculate the voxel coordinates
         voxel_coords = ((pcd_np[:, :3] -
-                         np.floor(np.array([self.lidar_range[0],
-                                            self.lidar_range[1],
-                                            self.lidar_range[2]])) / (
-                             self.vw, self.vh, self.vd))).astype(np.int32)
+                         np.floor(np.array([self.lidar_range[0], self.lidar_range[1], self.lidar_range[2]])) /
+                         (self.vw, self.vh, self.vd))).astype(np.int32)
 
         # convert to  (D, H, W) as the paper
         voxel_coords = voxel_coords[:, [2, 1, 0]]
@@ -113,14 +110,12 @@ class VoxelPreprocessor(BasePreprocessor):
         for i in range(len(batch)):
             voxel_features.append(batch[i]['voxel_features'])
             coords = batch[i]['voxel_coords']
-            voxel_coords.append(
-                np.pad(coords, ((0, 0), (1, 0)), mode='constant', constant_values=i))
+            voxel_coords.append(np.pad(coords, ((0, 0), (1, 0)), mode='constant', constant_values=i))
 
         voxel_features = torch.from_numpy(np.concatenate(voxel_features))
         voxel_coords = torch.from_numpy(np.concatenate(voxel_coords))
 
-        return {'voxel_features': voxel_features,
-                'voxel_coords': voxel_coords}
+        return {'voxel_features': voxel_features, 'voxel_coords': voxel_coords}
 
     @staticmethod
     def collate_batch_dict(batch: dict):
@@ -146,5 +141,4 @@ class VoxelPreprocessor(BasePreprocessor):
 
         voxel_coords = torch.from_numpy(np.concatenate(voxel_coords))
 
-        return {'voxel_features': voxel_features,
-                'voxel_coords': voxel_coords}
+        return {'voxel_features': voxel_features, 'voxel_coords': voxel_coords}
