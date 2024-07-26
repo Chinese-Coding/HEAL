@@ -12,21 +12,11 @@ import torch
 
 from opencood.data_utils.pre_processor import build_preprocessor
 from opencood.utils import box_utils as box_utils
-from opencood.utils.camera_utils import (
-    sample_augmentation,
-    img_transform,
-    normalize_img,
-    img_to_tensor,
-)
+from opencood.utils.camera_utils import sample_augmentation, img_transform, normalize_img, img_to_tensor
 from opencood.utils.common_utils import merge_features_to_dict
 from opencood.utils.common_utils import read_json
 from opencood.utils.heter_utils import Adaptor
-from opencood.utils.pcd_utils import (
-    mask_points_by_range,
-    mask_ego_points,
-    shuffle_points,
-    downsample_lidar_minimum,
-)
+from opencood.utils.pcd_utils import mask_points_by_range, mask_ego_points, shuffle_points, downsample_lidar_minimum
 from opencood.utils.pose_utils import add_noise_data_dict
 from opencood.utils.transformation_utils import x1_to_x2
 
@@ -44,7 +34,7 @@ def getLateheterFusionDataset(cls):
 
             self.heterogeneous = True
             self.modality_assignment = None if (
-                        'assignment_path' not in params['heter'] or params['heter']['assignment_path'] is None) \
+                    'assignment_path' not in params['heter'] or params['heter']['assignment_path'] is None) \
                 else read_json(params['heter']['assignment_path'])
             self.ego_modality = params['heter']['ego_modality']  # "m1" or "m1&m2" or "m3"
 
@@ -62,10 +52,8 @@ def getLateheterFusionDataset(cls):
                 if modal_setting['sensor_type'] == 'lidar':
                     setattr(self, f"pre_processor_{modality_name}",
                             build_preprocessor(modal_setting['preprocess'], train))
-
                 elif modal_setting['sensor_type'] == 'camera':
                     setattr(self, f"data_aug_conf_{modality_name}", modal_setting['data_aug_conf'])
-
                 else:
                     raise "Not support this type of sensor"
 
@@ -81,11 +69,9 @@ def getLateheterFusionDataset(cls):
 
         def get_item_train(self, base_data_dict):
             processed_data_dict = OrderedDict()
-            base_data_dict = add_noise_data_dict(
-                base_data_dict, self.params["noise_setting"]
-            )
-            # during training, we return a random cav's data
-            # only one vehicle is in processed_data_dict
+            base_data_dict = add_noise_data_dict(base_data_dict, self.params["noise_setting"])
+            # during training, we return a random cav's data only one vehicle is in processed_data_dict
+            # TODO: 只选择一个车辆!
             if not self.visualize:
                 options = []
                 for cav_id, cav_content in base_data_dict.items():
@@ -102,7 +88,7 @@ def getLateheterFusionDataset(cls):
 
         def get_item_test(self, base_data_dict, idx):
             """
-                processed_data_dict.keys() = ['ego', "650", "659", ...]
+            processed_data_dict.keys() = ['ego', "650", "659", ...]
             """
             base_data_dict = add_noise_data_dict(base_data_dict, self.params['noise_setting'])
 
@@ -125,12 +111,8 @@ def getLateheterFusionDataset(cls):
 
             # loop over all CAVs to process information
             for cav_id, selected_cav_base in base_data_dict.items():
-                distance = \
-                    math.sqrt((selected_cav_base['params']['lidar_pose'][0] -
-                               ego_lidar_pose[0]) ** 2 + (
-                                      selected_cav_base['params'][
-                                          'lidar_pose'][1] - ego_lidar_pose[
-                                          1]) ** 2)
+                distance = math.sqrt((selected_cav_base['params']['lidar_pose'][0] - ego_lidar_pose[0]) ** 2 +
+                                     (selected_cav_base['params']['lidar_pose'][1] - ego_lidar_pose[1]) ** 2)
                 if distance > self.params['comm_range']:
                     continue
 
@@ -153,8 +135,7 @@ def getLateheterFusionDataset(cls):
                 self.label_type = 'lidar'  # DAIRV2X
                 self.generate_object_center = self.generate_object_center_lidar  # OPV2V, V2XSET
 
-                selected_cav_processed = \
-                    self.get_item_single_car(selected_cav_base)
+                selected_cav_processed = self.get_item_single_car(selected_cav_base)
                 selected_cav_processed.update({'transformation_matrix': transformation_matrix,
                                                'transformation_matrix_clean': transformation_matrix_clean})
                 update_cav = "ego" if cav_id == ego_id else cav_id
@@ -192,9 +173,8 @@ def getLateheterFusionDataset(cls):
             if sensor_type == "lidar" or self.visualize:
                 lidar_np = selected_cav_base['lidar_np']
                 lidar_np = shuffle_points(lidar_np)
-                lidar_np = mask_points_by_range(lidar_np,
-                                                self.params['preprocess'][
-                                                    'cav_lidar_range'])
+                lidar_np = mask_points_by_range(lidar_np, self.params['preprocess']['cav_lidar_range'])
+
                 # remove points that hit ego vehicle
                 lidar_np = mask_ego_points(lidar_np)
 
@@ -228,9 +208,7 @@ def getLateheterFusionDataset(cls):
                     camera_to_lidar, camera_intrinsic = self.get_ext_int(params, idx)
 
                     intrin = torch.from_numpy(camera_intrinsic)
-                    rot = torch.from_numpy(
-                        camera_to_lidar[:3, :3]
-                    )  # R_wc, we consider world-coord is the lidar-coord
+                    rot = torch.from_numpy(camera_to_lidar[:3, :3])  # R_wc, we consider world-coord is the lidar-coord
                     tran = torch.from_numpy(camera_to_lidar[:3, 3])  # T_wc
 
                     post_rot = torch.eye(2)
@@ -277,29 +255,24 @@ def getLateheterFusionDataset(cls):
                     post_rots.append(post_rot)
                     post_trans.append(post_tran)
 
-                selected_cav_processed.update(
-                    {
-                        f"image_inputs_{modality_name}":
-                            {
-                                "imgs": torch.stack(imgs),  # [N, 3or4, H, W]
-                                "intrins": torch.stack(intrins),
-                                "extrinsics": torch.stack(extrinsics),
-                                "rots": torch.stack(rots),
-                                "trans": torch.stack(trans),
-                                "post_rots": torch.stack(post_rots),
-                                "post_trans": torch.stack(post_trans),
-                            }
+                selected_cav_processed.update({
+                    f"image_inputs_{modality_name}": {
+                        "imgs": torch.stack(imgs),  # [N, 3or4, H, W]
+                        "intrins": torch.stack(intrins),
+                        "extrinsics": torch.stack(extrinsics),
+                        "rots": torch.stack(rots),
+                        "trans": torch.stack(trans),
+                        "post_rots": torch.stack(post_rots),
+                        "post_trans": torch.stack(post_trans),
                     }
-                )
+                })
 
-            selected_cav_processed.update(
-                {
-                    "object_bbx_center": object_bbx_center,
-                    "object_bbx_mask": object_bbx_mask,
-                    "object_ids": object_ids,
-                    "modality_name": modality_name
-                }
-            )
+            selected_cav_processed.update({
+                "object_bbx_center": object_bbx_center,
+                "object_bbx_mask": object_bbx_mask,
+                "object_ids": object_ids,
+                "modality_name": modality_name
+            })
 
             # generate targets label
             label_dict = self.post_processor.generate_label(
@@ -346,20 +319,19 @@ def getLateheterFusionDataset(cls):
             # convert to numpy, (B, max_num, 7)
             object_bbx_center = torch.from_numpy(np.array(object_bbx_center))
             object_bbx_mask = torch.from_numpy(np.array(object_bbx_mask))
-            label_torch_dict = \
-                self.post_processor.collate_batch(label_dict_list)
+            label_torch_dict = self.post_processor.collate_batch(label_dict_list)
 
             # for centerpoint
-            label_torch_dict.update({'object_bbx_center': object_bbx_center,
-                                     'object_bbx_mask': object_bbx_mask})
+            label_torch_dict.update({'object_bbx_center': object_bbx_center, 'object_bbx_mask': object_bbx_mask})
 
-            output_dict['ego'].update({'object_bbx_center': object_bbx_center,
-                                       'object_bbx_mask': object_bbx_mask,
-                                       'anchor_box': torch.from_numpy(self.anchor_box),
-                                       'label_dict': label_torch_dict})
+            output_dict['ego'].update({
+                'object_bbx_center': object_bbx_center,
+                'object_bbx_mask': object_bbx_mask,
+                'anchor_box': torch.from_numpy(self.anchor_box),
+                'label_dict': label_torch_dict
+            })
             if self.visualize:
-                origin_lidar = \
-                    np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar))
+                origin_lidar = np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar))
                 origin_lidar = torch.from_numpy(origin_lidar)
                 output_dict['ego'].update({'origin_lidar': origin_lidar})
 
@@ -415,17 +387,13 @@ def getLateheterFusionDataset(cls):
 
                 output_dict.update({cav_id: {}})
                 # shape: (1, max_num, 7)
-                object_bbx_center = \
-                    torch.from_numpy(np.array([cav_content['object_bbx_center']]))
-                object_bbx_mask = \
-                    torch.from_numpy(np.array([cav_content['object_bbx_mask']]))
+                object_bbx_center = torch.from_numpy(np.array([cav_content['object_bbx_center']]))
+                object_bbx_mask = torch.from_numpy(np.array([cav_content['object_bbx_mask']]))
                 object_ids = cav_content['object_ids']
 
                 # the anchor box is the same for all bounding boxes usually, thus
                 # we don't need the batch dimension.
-                output_dict[cav_id].update(
-                    {"anchor_box": self.anchor_box_torch}
-                )
+                output_dict[cav_id].update({"anchor_box": self.anchor_box_torch})
 
                 transformation_matrix = cav_content['transformation_matrix']
                 if self.visualize:
@@ -433,9 +401,7 @@ def getLateheterFusionDataset(cls):
                     if (self.params.get('only_vis_ego', True) is False) or (cav_id == 'ego'):
                         projected_lidar = copy.deepcopy(cav_content['origin_lidar'])
                         projected_lidar[:, :3] = \
-                            box_utils.project_points_by_matrix_torch(
-                                projected_lidar[:, :3],
-                                transformation_matrix)
+                            box_utils.project_points_by_matrix_torch(projected_lidar[:, :3], transformation_matrix)
                         projected_lidar_list.append(projected_lidar)
 
                 if sensor_type == "lidar":
@@ -455,54 +421,47 @@ def getLateheterFusionDataset(cls):
                     post_rots_batch = [cav_content[f"image_inputs_{modality_name}"]["post_rots"]]
 
                     output_dict[cav_id].update({
-                        f"inputs_{modality_name}":
-                            {
-                                "imgs": torch.stack(imgs_batch),
-                                "rots": torch.stack(rots_batch),
-                                "trans": torch.stack(trans_batch),
-                                "intrins": torch.stack(intrins_batch),
-                                "extrinsics": torch.stack(extrinsics_batch),
-                                "post_trans": torch.stack(post_trans_batch),
-                                "post_rots": torch.stack(post_rots_batch),
-                            }
-                    }
-                    )
+                        f"inputs_{modality_name}": {
+                            "imgs": torch.stack(imgs_batch),
+                            "rots": torch.stack(rots_batch),
+                            "trans": torch.stack(trans_batch),
+                            "intrins": torch.stack(intrins_batch),
+                            "extrinsics": torch.stack(extrinsics_batch),
+                            "post_trans": torch.stack(post_trans_batch),
+                            "post_rots": torch.stack(post_rots_batch),
+                        }
+                    })
 
                 # label dictionary
-                label_torch_dict = \
-                    self.post_processor.collate_batch([cav_content['label_dict']])
+                label_torch_dict = self.post_processor.collate_batch([cav_content['label_dict']])
 
                 # for centerpoint
-                label_torch_dict.update({'object_bbx_center': object_bbx_center,
-                                         'object_bbx_mask': object_bbx_mask})
+                label_torch_dict.update({'object_bbx_center': object_bbx_center, 'object_bbx_mask': object_bbx_mask})
 
                 # save the transformation matrix (4, 4) to ego vehicle
                 transformation_matrix_torch = \
-                    torch.from_numpy(
-                        np.array(cav_content['transformation_matrix'])).float()
+                    torch.from_numpy(np.array(cav_content['transformation_matrix'])).float()
 
                 transformation_matrix_clean_torch = \
-                    torch.from_numpy(
-                        np.array(cav_content['transformation_matrix_clean'])).float()
+                    torch.from_numpy(np.array(cav_content['transformation_matrix_clean'])).float()
 
-                output_dict[cav_id].update({'object_bbx_center': object_bbx_center,
-                                            'object_bbx_mask': object_bbx_mask,
-                                            'label_dict': label_torch_dict,
-                                            'object_ids': object_ids,
-                                            'transformation_matrix': transformation_matrix_torch,
-                                            'transformation_matrix_clean': transformation_matrix_clean_torch,
-                                            'modality_name': modality_name})
+                output_dict[cav_id].update({
+                    'object_bbx_center': object_bbx_center,
+                    'object_bbx_mask': object_bbx_mask,
+                    'label_dict': label_torch_dict,
+                    'object_ids': object_ids,
+                    'transformation_matrix': transformation_matrix_torch,
+                    'transformation_matrix_clean': transformation_matrix_clean_torch,
+                    'modality_name': modality_name
+                })
 
                 if self.visualize:
-                    origin_lidar = \
-                        np.array(
-                            downsample_lidar_minimum(pcd_np_list=origin_lidar))
+                    origin_lidar = np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar))
                     origin_lidar = torch.from_numpy(origin_lidar)
                     output_dict[cav_id].update({'origin_lidar': origin_lidar})
 
             if self.visualize:
-                projected_lidar_stack = [torch.from_numpy(
-                    np.vstack(projected_lidar_list))]
+                projected_lidar_stack = [torch.from_numpy(np.vstack(projected_lidar_list))]
                 output_dict['ego'].update({'origin_lidar': projected_lidar_stack})
                 # output_dict['ego'].update({'projected_lidar_list': projected_lidar_list})
 
@@ -527,9 +486,7 @@ def getLateheterFusionDataset(cls):
             gt_box_tensor : torch.Tensor
                 The tensor of gt bounding box.
             """
-            pred_box_tensor, pred_score = self.post_processor.post_process(
-                data_dict, output_dict
-            )
+            pred_box_tensor, pred_score = self.post_processor.post_process(data_dict, output_dict)
             gt_box_tensor = self.post_processor.generate_gt_bbx(data_dict)
 
             return pred_box_tensor, pred_score, gt_box_tensor
@@ -539,9 +496,7 @@ def getLateheterFusionDataset(cls):
             data_dict_ego["ego"] = data_dict["ego"]
             gt_box_tensor = self.post_processor.generate_gt_bbx(data_dict)
 
-            pred_box_tensor, pred_score = self.post_processor.post_process(
-                data_dict_ego, output_dict_ego
-            )
+            pred_box_tensor, pred_score = self.post_processor.post_process(data_dict_ego, output_dict_ego)
             return pred_box_tensor, pred_score, gt_box_tensor
 
         def post_process_no_fusion_uncertainty(self, data_dict, output_dict_ego):

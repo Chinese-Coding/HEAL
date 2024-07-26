@@ -1,15 +1,11 @@
 """
 3D Anchor Generator for Voxel
 """
-import math
-import sys
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 
-from opencood.data_utils.post_processor.voxel_postprocessor \
-    import VoxelPostprocessor
+from opencood.data_utils.post_processor.voxel_postprocessor  import VoxelPostprocessor
 from opencood.utils import box_utils
 
 

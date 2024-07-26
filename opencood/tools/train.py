@@ -93,11 +93,13 @@ def main():
             logger.success(f'Using device: {device}, Using GPU index: {absolute_gup_index}')
         else:
             logger.success(f'Using device: {device}')
+        net_num = sum(p.numel() for p in model.parameters())
         model.to(device)
+
     else:
         logger.error('cuda is not available. Please check.')
         exit(-1)
-    logger.success(f'model 类型: {type(model)}')
+    logger.success(f'model 类型: {type(model)}, 模型参数个数: {net_num}')
     logger.success(f'loss 类型: {type(criterion)}')
     logger.success(f'optimizer 类型: {type(optimizer)}')
 

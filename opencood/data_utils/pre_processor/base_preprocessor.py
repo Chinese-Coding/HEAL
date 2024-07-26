@@ -1,11 +1,36 @@
 # -*- coding: utf-8 -*-
 # Author: Runsheng Xu <rxx3386@ucla.edu>
 # License: TDG-Attribution-NonCommercial-NoDistrib
+from dataclasses import dataclass
+from typing import Mapping
 
 import numpy as np
 
 from opencood.utils import pcd_utils
 
+
+# @dataclass
+# class PreprocessorParams:
+#     """
+#     专门用于存储, preprocessor 各个类所需的参数
+#     TODO: 目前仅支持 SpVoxelPreprocessor
+#     """
+#     lidar_range: List[float]
+#     voxel_size: List[float]
+#     max_points_per_voxel: int
+#     max_voxels: int
+#     sample_num: int
+#     cav_lidar_range: List[float]
+#
+#     def __init__(self, preprocessor_params: Mapping, train=True):
+#         self.lidar_range = preprocessor_params['cav_lidar_range']
+#         self.voxel_size = preprocessor_params['args']['voxel_size']
+#         self.max_points_per_voxel = preprocessor_params['args']['max_points_per_voxel']
+#         temp = f'max_voxels_train' if train else 'max_voxels_test'
+#         self.max_voxels = preprocessor_params['args'][temp]
+#         self.sample_num = preprocessor_params['args']['sample_num']
+#         self.cav_lidar_range= preprocessor_params['cav_lidar_range']
+#
 
 class BasePreprocessor:
     """
@@ -20,8 +45,8 @@ class BasePreprocessor:
         Train or test mode.
     """
 
-    def __init__(self, preprocess_params, train):
-        self.params = preprocess_params
+    def __init__(self, params, train):
+        self.params = params
         self.train = train
 
     def preprocess(self, pcd_np):

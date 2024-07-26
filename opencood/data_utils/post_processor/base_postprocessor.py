@@ -7,10 +7,9 @@ Template for AnchorGenerator
 """
 from typing import Mapping
 
+import cv2
 import numpy as np
 import torch
-import cv2
-from IPython.core.ultratb import ListTB
 
 from opencood.utils import box_utils
 from opencood.utils import common_utils
@@ -468,7 +467,7 @@ class BasePostprocessor:
         # 1-time filter: in ego coordinate, use visibility map to filter.
         box_utils.project_world_visible_objects(tmp_object_dict, output_dict, ego_lidar_pose,
                                                 inf_filter_range, self.params['order'], visibility_map, enlarge_z)
-
+        # TODO: 经过上面那个函数好像会过滤掉一部分的框,
         updated_tmp_object_dict = {}
         for k, v in tmp_object_dict.items():
             if k in output_dict:

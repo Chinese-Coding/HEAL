@@ -12,18 +12,9 @@ import torch
 
 from opencood.data_utils.datasets.basedataset.base_dataset import BaseDataset
 from opencood.utils import box_utils as box_utils
-from opencood.utils.camera_utils import (
-    sample_augmentation,
-    img_transform,
-    normalize_img,
-    img_to_tensor,
-)
+from opencood.utils.camera_utils import sample_augmentation, img_transform, normalize_img, img_to_tensor
 from opencood.utils.common_utils import merge_features_to_dict
-from opencood.utils.pcd_utils import (
-    mask_ego_points,
-    shuffle_points,
-    downsample_lidar_minimum,
-)
+from opencood.utils.pcd_utils import mask_ego_points, shuffle_points, downsample_lidar_minimum
 from opencood.utils.pose_utils import add_noise_data_dict
 from opencood.utils.transformation_utils import x1_to_x2, get_pairwise_transformation
 
@@ -123,20 +114,13 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
                 camera_data_list = selected_cav_base["camera_data"]
 
                 params = selected_cav_base["params"]
-                imgs = []
-                rots = []
-                trans = []
-                intrins = []
-                post_rots = []
-                post_trans = []
+                imgs, rots, trans, intrins, extrinsics, post_rots, post_trans = [], [], [], [], [], [], []
 
                 for idx, img in enumerate(camera_data_list):
                     camera_to_lidar, camera_intrinsic = self.get_ext_int(params, idx)
 
                     intrin = torch.from_numpy(camera_intrinsic)
-                    rot = torch.from_numpy(
-                        camera_to_lidar[:3, :3]
-                    )  # R_wc, we consider world-coord is the lidar-coord
+                    rot = torch.from_numpy(camera_to_lidar[:3, :3])  # R_wc, we consider world-coord is the lidar-coord
                     tran = torch.from_numpy(camera_to_lidar[:3, 3])  # T_wc
 
                     post_rot = torch.eye(2)
@@ -184,36 +168,31 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
                     post_rots.append(post_rot)
                     post_trans.append(post_tran)
 
-                selected_cav_processed.update(
-                    {
-                        "image_inputs":
-                            {
-                                "imgs": torch.stack(imgs),  # [Ncam, 3or4, H, W]
-                                "intrins": torch.stack(intrins),
-                                "rots": torch.stack(rots),
-                                "trans": torch.stack(trans),
-                                "post_rots": torch.stack(post_rots),
-                                "post_trans": torch.stack(post_trans),
-                            }
+                selected_cav_processed.update({
+                    "image_inputs": {
+                        "imgs": torch.stack(imgs),  # [Ncam, 3or4, H, W]
+                        "intrins": torch.stack(intrins),
+                        "rots": torch.stack(rots),
+                        "trans": torch.stack(trans),
+                        "post_rots": torch.stack(post_rots),
+                        "post_trans": torch.stack(post_trans),
                     }
-                )
+                })
 
             # anchor box
             selected_cav_processed.update({"anchor_box": self.anchor_box})
 
             # note the reference pose ego
-            object_bbx_center, object_bbx_mask, object_ids = self.generate_object_center([selected_cav_base],
-                                                                                         ego_pose_clean)
+            object_bbx_center, object_bbx_mask, object_ids = \
+                self.generate_object_center([selected_cav_base], ego_pose_clean)
 
-            selected_cav_processed.update(
-                {
-                    "object_bbx_center": object_bbx_center[object_bbx_mask == 1],
-                    "object_bbx_mask": object_bbx_mask,
-                    "object_ids": object_ids,
-                    'transformation_matrix': transformation_matrix,
-                    'transformation_matrix_clean': transformation_matrix_clean
-                }
-            )
+            selected_cav_processed.update({
+                "object_bbx_center": object_bbx_center[object_bbx_mask == 1],
+                "object_bbx_mask": object_bbx_mask,
+                "object_ids": object_ids,
+                'transformation_matrix': transformation_matrix,
+                'transformation_matrix_clean': transformation_matrix_clean
+            })
 
             return selected_cav_processed
 
@@ -236,8 +215,7 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
                     ego_cav_base = cav_content
                     break
 
-            assert cav_id == list(base_data_dict.keys())[
-                0], "The first element in the OrderedDict must be ego"
+            assert cav_id == list(base_data_dict.keys())[0], "The first element in the OrderedDict must be ego"
             assert ego_id != -1
             assert len(ego_lidar_pose) > 0
 
@@ -262,12 +240,8 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
             # loop over all CAVs to process information
             for cav_id, selected_cav_base in base_data_dict.items():
                 # check if the cav is within the communication range with ego
-                distance = \
-                    math.sqrt((selected_cav_base['params']['lidar_pose'][0] -
-                               ego_lidar_pose[0]) ** 2 + (
-                                      selected_cav_base['params'][
-                                          'lidar_pose'][1] - ego_lidar_pose[
-                                          1]) ** 2)
+                distance = math.sqrt((selected_cav_base['params']['lidar_pose'][0] - ego_lidar_pose[0]) ** 2 +
+                                     (selected_cav_base['params']['lidar_pose'][1] - ego_lidar_pose[1]) ** 2)
 
                 # if distance is too far, we will just skip this agent
                 if distance > self.params['comm_range']:
@@ -281,10 +255,7 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
             for cav_id in too_far:
                 base_data_dict.pop(cav_id)
 
-            pairwise_t_matrix = \
-                get_pairwise_transformation(base_data_dict,
-                                            self.max_cav,
-                                            self.proj_first)
+            pairwise_t_matrix = get_pairwise_transformation(base_data_dict, self.max_cav, self.proj_first)
 
             lidar_poses = np.array(lidar_pose_list).reshape(-1, 6)  # [N_cav, 6]
             lidar_poses_clean = np.array(lidar_pose_clean_list).reshape(-1, 6)  # [N_cav, 6]
@@ -307,9 +278,7 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
                 elif (not self.visualize) and self.heterogeneous and (not lidar_agent[_i]):
                     self.generate_object_center = self.generate_object_center_camera
 
-                selected_cav_processed = self.get_item_single_car(
-                    selected_cav_base,
-                    ego_cav_base)
+                selected_cav_processed = self.get_item_single_car(selected_cav_base, ego_cav_base)
 
                 object_stack.append(selected_cav_processed['object_bbx_center'])
                 object_id_stack += selected_cav_processed['object_ids']
@@ -336,56 +305,49 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
             label_dict_no_coop = single_label_list  # [{cav1_label}, {cav2_label}...]
 
             # exclude all repetitive objects
-            unique_indices = \
-                [object_id_stack.index(x) for x in set(object_id_stack)]
+            unique_indices = [object_id_stack.index(x) for x in set(object_id_stack)]
             object_stack = np.vstack(object_stack)
             object_stack = object_stack[unique_indices]
 
             # make sure bounding boxes across all frames have the same number
-            object_bbx_center = \
-                np.zeros((self.params['postprocess']['max_num'], 7))
+            object_bbx_center = np.zeros((self.params['postprocess']['max_num'], 7))
             mask = np.zeros(self.params['postprocess']['max_num'])
             object_bbx_center[:object_stack.shape[0], :] = object_stack
             mask[:object_stack.shape[0]] = 1
 
             if self.load_lidar_file:
                 merged_feature_dict = merge_features_to_dict(processed_features)
-                processed_data_dict['ego'].update({'processed_lidar': merged_feature_dict,
-                                                   'vsa_lidar': vsa_lidar_stack})
+                processed_data_dict['ego'].update(
+                    {'processed_lidar': merged_feature_dict, 'vsa_lidar': vsa_lidar_stack})
             if self.load_camera_file:
                 merged_image_inputs_dict = merge_features_to_dict(agents_image_inputs, merge='stack')
                 processed_data_dict['ego'].update({'image_inputs': merged_image_inputs_dict})
 
             # generate targets label
             label_dict_coop = \
-                self.post_processor.generate_label(
-                    gt_box_center=object_bbx_center,
-                    anchors=self.anchor_box,
-                    mask=mask)
+                self.post_processor.generate_label(gt_box_center=object_bbx_center, anchors=self.anchor_box, mask=mask)
 
             label_dict = {
                 'stage1': label_dict_no_coop,  # list
                 'stage2': label_dict_coop  # dict
             }
 
-            processed_data_dict['ego'].update(
-                {'object_bbx_center': object_bbx_center,
-                 'object_bbx_mask': mask,
-                 'object_ids': [object_id_stack[i] for i in unique_indices],
-                 'anchor_box': self.anchor_box,
-                 'label_dict': label_dict,
-                 'cav_num': cav_num,
-                 'pairwise_t_matrix': pairwise_t_matrix,
-                 'lidar_poses_clean': lidar_poses_clean,
-                 'lidar_poses': lidar_poses})
+            processed_data_dict['ego'].update({
+                'object_bbx_center': object_bbx_center,
+                'object_bbx_mask': mask,
+                'object_ids': [object_id_stack[i] for i in unique_indices],
+                'anchor_box': self.anchor_box,
+                'label_dict': label_dict,
+                'cav_num': cav_num,
+                'pairwise_t_matrix': pairwise_t_matrix,
+                'lidar_poses_clean': lidar_poses_clean,
+                'lidar_poses': lidar_poses
+            })
 
             if self.visualize:
-                processed_data_dict['ego'].update({'origin_lidar':
-                    np.vstack(
-                        projected_lidar_stack)})
+                processed_data_dict['ego'].update({'origin_lidar': np.vstack(projected_lidar_stack)})
 
-            processed_data_dict['ego'].update({'sample_idx': idx,
-                                               'cav_id_list': cav_id_list})
+            processed_data_dict['ego'].update({'sample_idx': idx, 'cav_id_list': cav_id_list})
 
             return processed_data_dict
 
@@ -456,8 +418,7 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
                         merged_feature_dict[k] = [v[index] for index in lidar_agent_idx]
 
                 if not self.heterogeneous or (self.heterogeneous and sum(lidar_agent) != 0):
-                    processed_lidar_torch_dict = \
-                        self.pre_processor.collate_batch(merged_feature_dict)
+                    processed_lidar_torch_dict = self.pre_processor.collate_batch(merged_feature_dict)
                     output_dict['ego'].update({'processed_lidar': processed_lidar_torch_dict})
 
             if self.load_camera_file:
@@ -480,11 +441,9 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
             label_dict_no_coop_cavs_batch_list = [label_dict for label_dict_cavs_list in
                                                   label_dict_no_coop_batch_list for label_dict in
                                                   label_dict_cavs_list]
-            label_no_coop_torch_dict = \
-                self.post_processor.collate_batch(label_dict_no_coop_cavs_batch_list)
+            label_no_coop_torch_dict = self.post_processor.collate_batch(label_dict_no_coop_cavs_batch_list)
 
-            label_torch_dict = \
-                self.post_processor.collate_batch(label_dict_list)
+            label_torch_dict = self.post_processor.collate_batch(label_dict_list)
 
             # (B, max_cav)
             pairwise_t_matrix = torch.from_numpy(np.array(pairwise_t_matrix_list))
@@ -495,19 +454,21 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
 
             # object id is only used during inference, where batch size is 1.
             # so here we only get the first element.
-            output_dict['ego'].update({'object_bbx_center': object_bbx_center,
-                                       'object_bbx_mask': object_bbx_mask,
-                                       'record_len': record_len,
-                                       'label_dict': {
-                                           'stage1': label_no_coop_torch_dict,
-                                           'stage2': label_torch_dict,
-                                       },
-                                       'object_ids': object_ids[0],
-                                       'pairwise_t_matrix': pairwise_t_matrix,
-                                       'lidar_pose_clean': lidar_pose_clean,
-                                       'lidar_pose': lidar_pose,
-                                       'proj_first': self.proj_first,
-                                       'anchor_box': self.anchor_box_torch})
+            output_dict['ego'].update({
+                'object_bbx_center': object_bbx_center,
+                'object_bbx_mask': object_bbx_mask,
+                'record_len': record_len,
+                'label_dict': {
+                    'stage1': label_no_coop_torch_dict,
+                    'stage2': label_torch_dict,
+                },
+                'object_ids': object_ids[0],
+                'pairwise_t_matrix': pairwise_t_matrix,
+                'lidar_pose_clean': lidar_pose_clean,
+                'lidar_pose': lidar_pose,
+                'proj_first': self.proj_first,
+                'anchor_box': self.anchor_box_torch
+            })
 
             if self.load_lidar_file:
                 coords = []
@@ -515,8 +476,7 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
                 for b in range(len(batch)):
                     for points in vsa_lidar[b]:
                         assert len(points) != 0
-                        coor_pad = np.pad(points, ((0, 0), (1, 0)),
-                                          mode="constant", constant_values=idx)
+                        coor_pad = np.pad(points, ((0, 0), (1, 0)), mode="constant", constant_values=idx)
                         coords.append(coor_pad)
                         idx += 1
                 origin_lidar_for_vsa = np.concatenate(coords, axis=0)
@@ -524,8 +484,7 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
                 output_dict['ego'].update({'origin_lidar_for_vsa': origin_lidar_for_vsa})
 
             if self.visualize:
-                origin_lidar = \
-                    np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar))
+                origin_lidar = np.array(downsample_lidar_minimum(pcd_np_list=origin_lidar))
                 origin_lidar = torch.from_numpy(origin_lidar)
                 output_dict['ego'].update({'origin_lidar': origin_lidar})
 
@@ -548,15 +507,13 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
             # save the transformation matrix (4, 4) to ego vehicle
             # transformation is only used in post process (no use.)
             # we all predict boxes in ego coord.
-            transformation_matrix_torch = \
-                torch.from_numpy(np.identity(4)).float()
-            transformation_matrix_clean_torch = \
-                torch.from_numpy(np.identity(4)).float()
+            transformation_matrix_torch = torch.from_numpy(np.identity(4)).float()
+            transformation_matrix_clean_torch = torch.from_numpy(np.identity(4)).float()
 
-            output_dict['ego'].update({'transformation_matrix':
-                                           transformation_matrix_torch,
-                                       'transformation_matrix_clean':
-                                           transformation_matrix_clean_torch, })
+            output_dict['ego'].update({
+                'transformation_matrix': transformation_matrix_torch,
+                'transformation_matrix_clean': transformation_matrix_clean_torch
+            })
 
             output_dict['ego'].update({
                 "sample_idx": batch[0]['ego']['sample_idx'],
@@ -584,8 +541,7 @@ def getIntermediate2stageFusionDataset(cls: Type[T]) -> Type[T]:
             gt_box_tensor : torch.Tensor
                 The tensor of gt bounding box.
             """
-            pred_box_tensor, pred_score = \
-                self.post_processor.post_process(data_dict, output_dict)
+            pred_box_tensor, pred_score = self.post_processor.post_process(data_dict, output_dict)
             gt_box_tensor = self.post_processor.generate_gt_bbx(data_dict)
 
             return pred_box_tensor, pred_score, gt_box_tensor

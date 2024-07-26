@@ -5,21 +5,21 @@ test_dir: "dataset/OPV2V/test"
 
 yaml_parser: "load_general_params"
 train_params:
-  batch_size: &batch_size 1
+  batch_size: 1
   epoches: 20
   eval_freq: 2
   save_freq: 2
   max_cav: 5
 
 comm_range: 70
-input_source: ['lidar', 'camera', 'depth']
+input_source: [ 'lidar', 'camera', 'depth' ]
 label_type: 'lidar'
-cav_lidar_range: &cav_lidar [-102.4, -102.4, -3, 102.4, 102.4, 1]
+cav_lidar_range: &cav_lidar [ -102.4, -102.4, -3, 102.4, 102.4, 1 ]
 
-add_data_extension: ['bev_visibility.png']
+add_data_extension: [ 'bev_visibility.png' ]
 
 heter:
-  assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json" 
+  assignment_path: "opencood/logs/heter_modality_assign/opv2v_4modality.json"
   ego_modality: &ego_modality "m1&m2"
   mapping_dict:
     m1: m1
@@ -36,7 +36,7 @@ heter:
         # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
         core_method: 'SpVoxelPreprocessor'
         args:
-          voxel_size: &voxel_size [0.4, 0.4, 4]
+          voxel_size: &voxel_size [ 0.4, 0.4, 4 ]
           max_points_per_voxel: 32
           max_voxel_train: 32000
           max_voxel_test: 70000
@@ -48,26 +48,26 @@ heter:
       core_method: &core_method_m2 "lift_splat_shoot"
 
       grid_conf: &grid_conf_m2
-        xbound: [-51.2, 51.2, 0.4]   # Limit the range of the x direction and divide the grids
-        ybound: [-51.2, 51.2, 0.4]   # Limit the range of the y direction and divide the grids
-        zbound: [-10, 10, 20.0]   # Limit the range of the z direction and divide the grids
-        ddiscr: [2, 50, 48]
+        xbound: [ -51.2, 51.2, 0.4 ]   # Limit the range of the x direction and divide the grids
+        ybound: [ -51.2, 51.2, 0.4 ]   # Limit the range of the y direction and divide the grids
+        zbound: [ -10, 10, 20.0 ]   # Limit the range of the z direction and divide the grids
+        ddiscr: [ 2, 50, 48 ]
         mode: 'LID'
       data_aug_conf: &data_aug_conf_m2
-        resize_lim: [0.65, 0.7]
-        final_dim: [384, 512]
-        rot_lim: [-3.6, 3.6]
+        resize_lim: [ 0.65, 0.7 ]
+        final_dim: [ 384, 512 ]
+        rot_lim: [ -3.6, 3.6 ]
         H: 600
         W: 800
         rand_flip: False
-        bot_pct_lim: [0.0, 0.05]
-        cams: ['camera0', 'camera1', 'camera2', 'camera3']
+        bot_pct_lim: [ 0.0, 0.05 ]
+        cams: [ 'camera0', 'camera1', 'camera2', 'camera3' ]
         Ncams: 4
 
 fusion:
   core_method: 'intermediateheter'
   dataset: 'opv2v'
-  args: 
+  args:
     proj_first: false
     grid_conf: None # place-holder
     data_aug_conf: None # place-holder
@@ -86,7 +86,7 @@ preprocess:
   # options: BasePreprocessor, VoxelPreprocessor, BevPreprocessor
   core_method: 'SpVoxelPreprocessor'
   args:
-    voxel_size: [0.4, 0.4, 4] # useful
+    voxel_size: [ 0.4, 0.4, 4 ] # useful
     max_points_per_voxel: 1 # useless
     max_voxel_train: 1 # useless
     max_voxel_test: 1 # useless
@@ -102,7 +102,7 @@ postprocess:
     l: 3.9
     w: 1.6
     h: 1.56
-    r: &anchor_yaw [0, 90]
+    r: &anchor_yaw [ 0, 90 ]
     feature_stride: 2
     num: &anchor_num 2
   target_args:
@@ -135,18 +135,18 @@ model:
           use_norm: true
           with_distance: false
           use_absolute_xyz: true
-          num_filters: [64]
+          num_filters: [ 64 ]
         point_pillar_scatter:
           num_features: 64
 
       backbone_args:
-        layer_nums: [3, 5, 8]
-        layer_strides: [2, 2, 2]
-        num_filters: [64, 128, 256]
-        upsample_strides: [1, 2, 4]
-        num_upsample_filter: [128, 128, 128]
-  
-      shrink_header: 
+        layer_nums: [ 3, 5, 8 ]
+        layer_strides: [ 2, 2, 2 ]
+        num_filters: [ 64, 128, 256 ]
+        upsample_strides: [ 1, 2, 4 ]
+        num_upsample_filter: [ 128, 128, 128 ]
+
+      shrink_header:
         kernal_size: [ 3 ]
         stride: [ 1 ]
         padding: [ 1 ]
@@ -172,21 +172,21 @@ model:
         grid_conf: *grid_conf_m2
 
       backbone_args:
-        layer_nums: [3, 5, 8]
-        layer_strides: [2, 2, 2]
-        num_filters: [64, 128, 256]
-        upsample_strides: [1, 2, 4]
-        num_upsample_filter: [128, 128, 128]
+        layer_nums: [ 3, 5, 8 ]
+        layer_strides: [ 2, 2, 2 ]
+        num_filters: [ 64, 128, 256 ]
+        upsample_strides: [ 1, 2, 4 ]
+        num_upsample_filter: [ 128, 128, 128 ]
         inplanes: 128
-  
-      shrink_header: 
+
+      shrink_header:
         kernal_size: [ 3 ]
         stride: [ 1 ]
         padding: [ 1 ]
         dim: [ 256 ]
         input_dim: 384 # 128 * 3
 
-    fusion_method: att 
+    fusion_method: att
     att:
       feat_dim: 256
 
@@ -226,5 +226,5 @@ optimizer:
 lr_scheduler:
   core_method: multistep #step, multistep and Exponential support
   gamma: 0.1
-  step_size: [10, 25]
+  step_size: [ 10, 25 ]
 

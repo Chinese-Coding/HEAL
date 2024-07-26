@@ -4,8 +4,7 @@
 import numpy as np
 import torch
 
-from opencood.data_utils.post_processor.voxel_postprocessor \
-    import VoxelPostprocessor
+from opencood.data_utils.post_processor.voxel_postprocessor import VoxelPostprocessor
 from opencood.utils import box_utils
 from opencood.utils import common_utils
 from opencood.utils.common_utils import limit_period
@@ -21,9 +20,9 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
     def post_process(self, data_dict, output_dict, stage1=False):
         if stage1:
             return self.post_process_stage1(data_dict, output_dict)
-        elif not self.redet: # stage2 refinement
+        elif not self.redet:  # stage2 refinement
             return self.post_process_stage2(data_dict)
-        else: # stage2 redetect
+        else:  # stage2 redetect
             return self.post_process_stage2_redet(data_dict, output_dict)
 
     def post_process_stage1(self, data_dict, output_dict):
@@ -67,13 +66,13 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
             reg = preds_dict['reg_preds']  # .permute(0, 2, 3, 1).contiguous()
             dir = preds_dict['dir_preds'].permute(0, 2, 3, 1).contiguous().reshape(1, -1, 2)
 
-            batch_box3d = self.delta_to_boxes3d(reg, anchor_box) # hwl
+            batch_box3d = self.delta_to_boxes3d(reg, anchor_box)  # hwl
             mask = torch.gt(prob, self.params['target_args']['score_threshold'])
             batch_num_box_count = [int(m.sum()) for m in mask]
             mask = mask.view(1, -1)
             mask_reg = mask.unsqueeze(2).repeat(1, 1, 7)
 
-            boxes3d = torch.masked_select(batch_box3d.view(-1, 7), mask_reg[0]).view(-1, 7) # hwl. right
+            boxes3d = torch.masked_select(batch_box3d.view(-1, 7), mask_reg[0]).view(-1, 7)  # hwl. right
             scores = torch.masked_select(prob.view(-1), mask[0])
 
             dir_labels = torch.max(dir, dim=-1)[1]
@@ -93,24 +92,24 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
                 dir = preds_dict['dir_preds'].permute(0, 2, 3, 1).contiguous().reshape(1, -1, 2)
                 dir_cls_preds = dir[mask]
                 # if rot_gt > 0, then the label is 1, then the regression target is [0, 1]
-                dir_labels = torch.max(dir_cls_preds, dim=-1)[1]  # indices. shape [1, N*H*W*2].  value 0 or 1. If value is 1, then rot_gt > 0
-                
-                period = (2 * np.pi / num_bins) # pi
+                dir_labels = torch.max(dir_cls_preds, dim=-1)[
+                    1]  # indices. shape [1, N*H*W*2].  value 0 or 1. If value is 1, then rot_gt > 0
+
+                period = (2 * np.pi / num_bins)  # pi
                 dir_rot = limit_period(
                     boxes3d[..., 6] - dir_offset, 0, period
-                ) # 限制在0到pi之间
-                boxes3d[..., 6] = dir_rot + dir_offset + period * dir_labels.to(dir_cls_preds.dtype) # 转化0.25pi到2.5pi
-                boxes3d[..., 6] = limit_period(boxes3d[..., 6], 0.5, 2 * np.pi) # limit to [-pi, pi]
-
+                )  # 限制在0到pi之间
+                boxes3d[..., 6] = dir_rot + dir_offset + period * dir_labels.to(dir_cls_preds.dtype)  # 转化0.25pi到2.5pi
+                boxes3d[..., 6] = limit_period(boxes3d[..., 6], 0.5, 2 * np.pi)  # limit to [-pi, pi]
 
                 # filter invalid boxes
                 keep_idx = torch.logical_and((boxes3d[:, 3:6] > 1).all(dim=1), (boxes3d[:, 3:6] < 10).all(dim=1))
                 idx_start = 0
                 count = []
                 for i, n in enumerate(batch_num_box_count):
-                    count.append(int(keep_idx[idx_start:idx_start+n].sum()))
+                    count.append(int(keep_idx[idx_start:idx_start + n].sum()))
                 batch_num_box_count = count
-                boxes3d = boxes3d[keep_idx] # hwl
+                boxes3d = boxes3d[keep_idx]  # hwl
                 scores = scores[keep_idx]
 
                 # if the number of boxes is too huge, this would consume a lot of memory in the second stage
@@ -130,7 +129,6 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
                 pred_box3d_list.append(boxes3d)
                 score_list.append(scores)
 
-
         if len(pred_box3d_list) == 0:
             return None, None
 
@@ -143,14 +141,14 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
         batch_pred_boxes3d = []
         batch_scores = []
         for n in batch_num_box_count:
-            cur_corners = pred_corners_tensor[cur_idx:cur_idx+n]
-            cur_scores = scores[cur_idx:cur_idx+n]
+            cur_corners = pred_corners_tensor[cur_idx:cur_idx + n]
+            cur_scores = scores[cur_idx:cur_idx + n]
             # nms
             keep_index = box_utils.nms_rotated(cur_corners,
                                                cur_scores,
                                                self.params['nms_thresh']
                                                )
-            cur_boxes = pred_box3d_tensor[cur_idx:cur_idx+n] # keep hwl, no need to transform
+            cur_boxes = pred_box3d_tensor[cur_idx:cur_idx + n]  # keep hwl, no need to transform
             batch_pred_boxes3d.append(cur_boxes[keep_index])
             batch_scores.append(cur_scores[keep_index])
             cur_idx += n
@@ -164,22 +162,21 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
         output_dict = data_dict['ego']['stage2_out']
         label_dict = data_dict['ego']['rcnn_label_dict']
         rcnn_cls = output_dict['rcnn_cls'].sigmoid().view(-1)
-        
+
         # use stage2 score
         if 'rcnn_iou' in output_dict:
             rcnn_iou = output_dict['rcnn_iou'].view(-1)
-            rcnn_iou = rcnn_iou / 2 + 0.5 # renormalize
-            rcnn_score = rcnn_cls * rcnn_iou**4
+            rcnn_iou = rcnn_iou / 2 + 0.5  # renormalize
+            rcnn_score = rcnn_cls * rcnn_iou ** 4
         else:
             rcnn_score = rcnn_cls
-        
+
         # use stage1 score 
         # rcnn_score = label_dict['rois_scores_stage1']
 
-
         rcnn_reg = output_dict['rcnn_reg'].view(-1, 7)
-        rois_anchor = label_dict['rois_anchor'] # lwh order
-        rois = label_dict['rois'] # lwh order 
+        rois_anchor = label_dict['rois_anchor']  # lwh order
+        rois = label_dict['rois']  # lwh order
         roi_center = rois[:, 0:3]
         roi_ry = rois[:, 6] % (2 * np.pi)
         boxes_local = box_utils.box_decode(rcnn_reg, rois_anchor)
@@ -196,14 +193,14 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
         scores = rcnn_score[mask]
         # gt_boxes = label_dict['gt_of_rois_src'][mask]
         mask = nms_gpu(detections, scores, thresh=0.01)[0]
-        boxes3d = detections[mask] # keep hwl
+        boxes3d = detections[mask]  # keep hwl
 
         projected_boxes3d = None
         if len(boxes3d) != 0:
             # (N, 8, 3)
             boxes3d_corner = \
                 box_utils.boxes_to_corners_3d(boxes3d,
-                                              order="lwh") # in stage 2, box encoding is dxdydz order
+                                              order="lwh")  # in stage 2, box encoding is dxdydz order
             # (N, 8, 3)
             projected_boxes3d = \
                 box_utils.project_box3d(boxes3d_corner,
@@ -217,7 +214,6 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
         mask = box_utils.get_mask_for_boxes_within_range_torch(projected_boxes3d, cav_range)
         projected_boxes3d = projected_boxes3d[mask]
         scores = scores[mask]
-
 
         return projected_boxes3d, scores
 
@@ -241,7 +237,6 @@ class FpvrcnnPostprocessor(VoxelPostprocessor):
     #     rcnn_score = rcnn_score[mask]
 
     #     return boxes3d_corner, rcnn_score.flatten()
-
 
     def post_process_stage2_redet(self, data_dict, output_dict):
         return super().post_process(data_dict, output_dict)

@@ -194,13 +194,7 @@ def getIntermediateheterFusionDataset(cls):
             if sensor_type == "camera":
                 camera_data_list = selected_cav_base["camera_data"]
                 params = selected_cav_base["params"]
-                imgs = []
-                rots = []
-                trans = []
-                intrins = []
-                extrinsics = []
-                post_rots = []
-                post_trans = []
+                imgs, rots, trans, intrins, extrinsics, post_rots, post_trans = [], [], [], [], [], [], []
 
                 for idx, img in enumerate(camera_data_list):
                     camera_to_lidar, camera_intrinsic = self.get_ext_int(params, idx)
@@ -531,7 +525,6 @@ def getIntermediateheterFusionDataset(cls):
                                                             mask=mask)
             """
             TODO: 最后返回的给模型的数据, 包含以下内容
-            TODO: 最后返回的给模型的数据, 包含以下内容
             里面的许多参数我都见过许多类似的, 内容经过更新
             是否里面的每个参数都用到了呢?
             """
@@ -560,32 +553,19 @@ def getIntermediateheterFusionDataset(cls):
             return processed_data_dict
 
         def collate_batch_train(self, batch):
+            """
+            GPT: 用于在训练过程中将单个样本数据整合成批次数据的函数。
+            它的目的是将不同车辆的传感器数据和标签整合到一个批次中，以便于模型的批量处理。
+            :param batch:
+            :return:
+            """
             # Intermediate fusion is different the other two
             output_dict = {'ego': {}}
 
-            # inputs_list_m1 = []
-            # inputs_list_m2 = []
-            # inputs_list_m3 = []
-            # inputs_list_m4 = []
+            inputs_list_dict = {'inputs_list_m1': [], 'inputs_list_m2': [], 'inputs_list_m3': [], 'inputs_list_m4': []}
 
-            inputs_list_dict = {
-                'inputs_list_m1': [],
-                'inputs_list_m2': [],
-                'inputs_list_m3': [],
-                'inputs_list_m4': []
-            }
-
-            # inputs_list_m1_proj = []
-            # inputs_list_m2_proj = []
-            # inputs_list_m3_proj = []
-            # inputs_list_m4_proj = []
-
-            inputs_list_proj_dict = {
-                'inputs_list_m1_proj': [],
-                'inputs_list_m2_proj': [],
-                'inputs_list_m3_proj': [],
-                'inputs_list_m4_proj': [],
-            }
+            inputs_list_proj_dict = {'inputs_list_m1_proj': [], 'inputs_list_m2_proj': [],
+                                     'inputs_list_m3_proj': [], 'inputs_list_m4_proj': [], }
 
             object_bbx_center = []
             object_bbx_mask = []
@@ -605,7 +585,7 @@ def getIntermediateheterFusionDataset(cls):
             # disconet
             teacher_processed_lidar_list = []
 
-            ### 2022.10.10 single gt ####
+            ### 2022.10.10 single gt #### TODO: 这个 if 语句及其内容有什么作用?
             if self.supervise_single or self.heterogeneous:
                 pos_equal_one_single = []
                 neg_equal_one_single = []
@@ -613,6 +593,8 @@ def getIntermediateheterFusionDataset(cls):
                 object_bbx_center_single = []
                 object_bbx_mask_single = []
 
+            # 对于批次中的每一个样本，提取其 ego 字典，
+            # 并将相关的数据（如 object_bbx_center、object_bbx_mask 等）添加到相应的列表中。
             for i in range(len(batch)):
                 ego_dict = batch[i]['ego']
                 object_bbx_center.append(ego_dict['object_bbx_center'])
@@ -645,7 +627,7 @@ def getIntermediateheterFusionDataset(cls):
                                 ego_dict[f'input_{modality_name}_proj'])
                             # eval(f"inputs_list_{modality_name}_proj").append(ego_dict[f"input_{modality_name}_proj"])
 
-                ### 2022.10.10 single gt ####
+                ### 2022.10.10 single gt #### TODO: 这段 if 语句又有什么作用? GPT: 单一 GT 数据 (这个数据有什么用吗) 我好像并没有在其他类中看到这个东西
                 if self.supervise_single or self.heterogeneous:
                     pos_equal_one_single.append(ego_dict['single_label_dict_torch']['pos_equal_one'])
                     neg_equal_one_single.append(ego_dict['single_label_dict_torch']['neg_equal_one'])
@@ -653,24 +635,26 @@ def getIntermediateheterFusionDataset(cls):
                     object_bbx_center_single.append(ego_dict['single_object_bbx_center_torch'])
                     object_bbx_mask_single.append(ego_dict['single_object_bbx_mask_torch'])
 
-            # convert to numpy, (B, max_num, 7)
+            # convert to numpy, (B, max_num, 7) 将收集到的数据列表转换为张量
             object_bbx_center = torch.from_numpy(np.array(object_bbx_center))
             object_bbx_mask = torch.from_numpy(np.array(object_bbx_mask))
 
             # 2023.2.5
+            # 对于每一个模态，合并其输入数据（如 Lidar 数据或 Camera 数据），并将其添加到 output_dict 中。
             for modality_name in self.modality_name_list:
                 # if len(eval(f"inputs_list_{modality_name}")) != 0:
                 if len(inputs_list_dict[f'inputs_list_{modality_name}']) != 0:
                     if self.sensor_type_dict[modality_name] == "lidar":
                         # merged_feature_dict = merge_features_to_dict(eval(f"inputs_list_{modality_name}"))
                         merged_feature_dict = merge_features_to_dict(inputs_list_dict[f'inputs_list_{modality_name}'])
-                        processed_lidar_torch_dict = eval(f"self.pre_processor_{modality_name}").collate_batch(
-                            merged_feature_dict)
-                        output_dict['ego'].update({f'inputs_{modality_name}': processed_lidar_torch_dict})
+                        processed_lidar_torch_dict = \
+                            eval(f"self.pre_processor_{modality_name}").collate_batch(merged_feature_dict)
 
+                        output_dict['ego'].update({f'inputs_{modality_name}': processed_lidar_torch_dict})
                     elif self.sensor_type_dict[modality_name] == "camera":
-                        merged_image_inputs_dict = merge_features_to_dict(
-                            inputs_list_dict[f'inputs_list_{modality_name}'], merge='cat')
+                        merged_image_inputs_dict = \
+                            merge_features_to_dict(inputs_list_dict[f'inputs_list_{modality_name}'], merge='cat')
+
                         output_dict['ego'].update({f'inputs_{modality_name}': merged_image_inputs_dict})
 
             output_dict['ego'].update({"agent_modality_list": agent_modality_list})
@@ -681,8 +665,7 @@ def getIntermediateheterFusionDataset(cls):
             label_torch_dict = self.post_processor.collate_batch(label_dict_list)
 
             # for centerpoint
-            label_torch_dict.update({'object_bbx_center': object_bbx_center,
-                                     'object_bbx_mask': object_bbx_mask})
+            label_torch_dict.update({'object_bbx_center': object_bbx_center, 'object_bbx_mask': object_bbx_mask})
 
             # (B, max_cav)
             pairwise_t_matrix = torch.from_numpy(np.array(pairwise_t_matrix_list))
@@ -722,8 +705,8 @@ def getIntermediateheterFusionDataset(cls):
                     if len(eval(f"inputs_list_{modality_name}_proj")) != 0 and self.sensor_type_dict[
                         modality_name] == "lidar":
                         merged_feature_proj_dict = merge_features_to_dict(eval(f"inputs_list_{modality_name}_proj"))
-                        processed_lidar_torch_proj_dict = eval(f"self.pre_processor_{modality_name}").collate_batch(
-                            merged_feature_proj_dict)
+                        processed_lidar_torch_proj_dict = \
+                            eval(f"self.pre_processor_{modality_name}").collate_batch(merged_feature_proj_dict)
                         output_dict['ego'].update({f'inputs_{modality_name}_proj': processed_lidar_torch_proj_dict})
 
             if self.supervise_single or self.heterogeneous:

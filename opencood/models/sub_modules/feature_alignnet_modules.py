@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Author: Yifan Lu <yifan_lu@sjtu.edu.cn>
 # License: TDG-Attribution-NonCommercial-NoDistrib
+from typing import Mapping
 
 import torch
 import torch.nn as nn
@@ -179,7 +180,7 @@ class SDTA(nn.Module):
 
 
 class Resnet3x3(nn.Module):
-    def __init__(self, args, deform=False):
+    def __init__(self, args: Mapping, deform=False):
         super().__init__()
         in_ch = args['in_ch']
         layernum = args['layer_num']

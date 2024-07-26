@@ -136,6 +136,9 @@ class SpVoxelPreprocessor(BasePreprocessor):
         """
         Collate batch if the batch is a dictionary,
         eg: {'voxel_features': [feature1, feature2...., feature n]}
+        GPT: 将一个包含点云数据的批次（batch）字典转换为适合 PyTorch 模型输入的格式。
+        具体来说，该函数处理的输入是一个字典，每个键都对应一个列表，这些列表包含不同点云帧（frame）的特征、坐标和点的数量。
+        该函数将这些列表中的数据合并，并转换为 PyTorch 张量（tensor），从而使数据能够被 PyTorch 模型有效地处理。
 
         Parameters
         ----------
@@ -152,9 +155,16 @@ class SpVoxelPreprocessor(BasePreprocessor):
         voxel_coords = []
 
         for i in range(len(coords)):
+            """
+            对于每一帧的坐标，在前面添加一列常数值 i，用以标识该坐标属于批次中的第 i 帧。
+            然后将所有帧的坐标合并成一个 numpy 数组，并将其转换为 PyTorch 张量。
+            coords[i] 是一个二维数组，形状为 (num_voxels, 3)，表示该帧的体素坐标，其中 num_voxels 是体素的数量，3 是每个体素坐标的维度（通常是 x, y, z）
+            ((0, 0), (1, 0)) 是填充宽度参数: (0, 0): 表示对第一个维度 (行) 不进行填充; (1, 0):表示对第二个维度（列）在前面填充 1 列，在后面不填充
+            mode='constant'：填充的模式为常数填充。
+            constant_values=i：填充值为常数 i，表示该帧在批次中的索引
+            填充后: (num_voxels, 4)
+            """
             voxel_coords.append(np.pad(coords[i], ((0, 0), (1, 0)), mode='constant', constant_values=i))
         voxel_coords = torch.from_numpy(np.concatenate(voxel_coords))
 
-        return {'voxel_features': voxel_features,
-                'voxel_coords': voxel_coords,
-                'voxel_num_points': voxel_num_points}
+        return {'voxel_features': voxel_features, 'voxel_coords': voxel_coords, 'voxel_num_points': voxel_num_points}
