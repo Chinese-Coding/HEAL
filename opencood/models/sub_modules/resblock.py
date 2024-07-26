@@ -5,11 +5,23 @@ import torch.nn as nn
 from torch import Tensor
 
 
+def conv7x7(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
+    """7x7 convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=7, stride=stride,
+                     padding=dilation, groups=groups, bias=False)
+
+
+def conv5x5(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
+    """5x5 convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=5, stride=stride,
+                     padding=dilation, groups=groups, bias=False)
+
+
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
     """3x3 convolution with padding"""
     # TODO: 参数 `padding` 和 `dilation` 为什么设置的值是一样的呢?
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+                     padding=dilation, groups=groups, bias=False, ) # dilation=dilation
 
 
 def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
@@ -38,7 +50,7 @@ class BasicBlock(nn.Module):
                     具体来说，dilation 指定了卷积核中元素之间的间距，从而影响卷积操作的感受野。
             norm_layer:
         """
-        super(BasicBlock, self).__init__()
+        super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         if groups != 1 or base_width != 64:

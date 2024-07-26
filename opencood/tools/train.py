@@ -51,11 +51,11 @@ def main():
     通常情况下，DataLoader 会自动将一个 batch 中的样本堆叠成张量（tensor），但在某些情况下，可能需要自定义这种组合方式。这时，collate_fn 就显得非常有用。
     """
     train_loader = DataLoader(train_dataset, batch_size=hypes['train_params']['batch_size'],
-                              num_workers=1, collate_fn=train_dataset.collate_batch_train,
+                              num_workers=8, collate_fn=train_dataset.collate_batch_train,
                               shuffle=False, pin_memory=True, drop_last=True, prefetch_factor=2)
 
     val_loader = DataLoader(validate_dataset, batch_size=hypes['train_params']['batch_size'],
-                            num_workers=1, collate_fn=train_dataset.collate_batch_train,
+                            num_workers=8, collate_fn=train_dataset.collate_batch_train,
                             shuffle=False, pin_memory=True, drop_last=True, prefetch_factor=2)
     logger.success('数据集加载完毕, 开始创建模型')
 

@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from opencood.models.sub_modules.my_resblock import MyResNetModified, MyBasicBlock
 from opencood.models.sub_modules.resblock import ResNetModified, BasicBlock
 
 DEBUG = False
@@ -43,6 +44,9 @@ class ResNetBEVBackbone(nn.Module):
         """
         开始定义网络
         """
+        self.my_resnet = MyResNetModified(MyBasicBlock, model_cfg['layer_nums'], model_cfg['layer_strides'],
+                                        model_cfg['num_filters'], inplanes=model_cfg.get('inplanes', 64))
+
         self.resnet = ResNetModified(BasicBlock, layer_nums, layer_strides, num_filters,
                                      inplanes=model_cfg.get('inplanes', 64))
 
@@ -83,7 +87,8 @@ class ResNetBEVBackbone(nn.Module):
 
         # 将 spatial_features 输入到 resnet 中，得到一个特征图的元组 x。每个元素对应 ResNet 中不同层的输出特征图
         # TODO: 为什么这里是元组呢?
-        x = self.resnet(spatial_features)  # tuple of features
+        # x = self.resnet(spatial_features)  # tuple of features
+        x = self.my_resnet(spatial_features)
         ups = []  # 初始化上采样结果列表? TODO: ups 是什么的缩写呢?
 
         for i in range(self.num_levels):
