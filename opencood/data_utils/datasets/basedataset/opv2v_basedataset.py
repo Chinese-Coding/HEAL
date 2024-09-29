@@ -128,12 +128,9 @@ class OPV2VBaseDataset(BaseDataset):
 
                     if getattr(self, "heterogeneous", False):
                         scenario_name = scenario_folder.split("/")[-1]
-
                         cav_modality = self.adaptor.reassign_cav_modality(
                             self.modality_assignment[scenario_name][cav_id], j)
-
                         self.scenario_database[i][cav_id][timestamp]['modality_name'] = cav_modality
-
                         self.scenario_database[i][cav_id][timestamp]['lidar'] = (
                             self.adaptor.switch_lidar_channels(cav_modality, lidar_file))
 

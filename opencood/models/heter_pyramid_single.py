@@ -36,15 +36,7 @@ class HeterPyramidSingle(nn.Module):
             sensor_name = model_setting['sensor_type']
             self.sensor_type_dict[modality_name] = sensor_name
 
-            # import model
-            # encoder_filename = "opencood.models.heter_encoders"
-            # encoder_lib = importlib.import_module(encoder_filename)
-            # encoder_class = None
-            # target_model_name = model_setting['core_method'].replace('_', '')
-            #
-            # for name, cls in encoder_lib.__dict__.items():
-            #     if name.lower() == target_model_name.lower():
-            #         encoder_class = cls
+
 
             # TODO: 这样利用字典从 `opencood.models.heter_encoders` 中引入, 看起来有些死板, 但是 IDE 的代码提示变好了啊
             #        也许将 `encoder` 再单独从这个文件里面提取出来比较好. 配置文件中 `encoder` 的命名方式最好和代码中的一样

@@ -51,9 +51,9 @@ def getEarlyFusionDataset(cls: Type[T]) -> Type[T]:
             self.anchor_box_torch = torch.from_numpy(self.anchor_box)
 
             self.heterogeneous = False
-            if 'heter' in params:
-                self.heterogeneous = True
-
+            # if 'heter' in params:
+            #     self.heterogeneous = True
+            self.reinitialize()
         def __getitem__(self, idx):
             base_data_dict = self.retrieve_base_data(idx)
 

@@ -174,8 +174,10 @@ class PillarVFE(nn.Module):
         同时为了获得每个 pillar 的中心点坐标，还需要加上每个 pillar 长宽的一半得到中心点坐标
         每个点的 x、y、z 减去对应pillar的坐标中心点，得到每个点到该点中心点的偏移量
         """
+        # .to(voxel_features.dtype)
+        tmp = (coords[:, 3].unsqueeze(1) * self.voxel_x + self.x_offset)
         f_center[:, :, 0] = voxel_features[:, :, 0] - (
-                coords[:, 3].to(voxel_features.dtype).unsqueeze(1) * self.voxel_x + self.x_offset)
+                coords[:, 3].unsqueeze(1) * self.voxel_x + self.x_offset)
         f_center[:, :, 1] = voxel_features[:, :, 1] - (
                 coords[:, 2].to(voxel_features.dtype).unsqueeze(1) * self.voxel_y + self.y_offset)
         f_center[:, :, 2] = voxel_features[:, :, 2] - (

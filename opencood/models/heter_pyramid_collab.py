@@ -40,20 +40,12 @@ class HeterPyramidCollab(nn.Module):
 
         # setup each modality model (设置每个模态模型) m1, m2, m3, m4
         # 每个模态有各自不同的 encoder, backbone, Aligner
+        self.encoders, self.backbones, self.aligners = nn.ModuleDict(), nn.ModuleDict(), nn.ModuleDict()
         for modality_name in self.modality_name_list:
             model_setting = args[modality_name]
             sensor_name = model_setting['sensor_type']
             self.sensor_type_dict[modality_name] = sensor_name
 
-            # import model
-            # encoder_filename = "opencood.models.heter_encoders"
-            # encoder_lib = importlib.import_module(encoder_filename)
-            # encoder_class = None
-            # target_model_name = model_setting['core_method'].replace('_', '')
-            #
-            # for name, cls in encoder_lib.__dict__.items():
-            #     if name.lower() == target_model_name.lower():
-            #         encoder_class = cls
             # TODO: 如果找到了直接 break 是否更好一些呢?
             try:
                 encoder_class = encoders[model_setting['core_method']]
@@ -65,7 +57,9 @@ class HeterPyramidCollab(nn.Module):
 
             """Encoder building"""
             # setattr 是 Python 内置的一个函数，用于动态地为对象设置属性, python真的十分灵活......
-            setattr(self, f"encoder_{modality_name}", encoder_class(model_setting['encoder_args']))
+            self.encoders[modality_name] = encoder_class(model_setting['encoder_args'])
+            # setattr(self, f"encoder_{modality_name}", encoder_class(model_setting['encoder_args']))
+
             # 判断是否启用了深度监督
             if model_setting['encoder_args'].get("depth_supervision", False):
                 setattr(self, f"depth_supervision_{modality_name}", True)
@@ -73,10 +67,11 @@ class HeterPyramidCollab(nn.Module):
                 setattr(self, f"depth_supervision_{modality_name}", False)
 
             """Backbone building"""
-            setattr(self, f"backbone_{modality_name}", ResNetBEVBackbone(model_setting['backbone_args']))
+            self.backbones[modality_name] = ResNetBEVBackbone(model_setting['backbone_args'])
 
             """Aligner building"""
-            setattr(self, f"aligner_{modality_name}", AlignNet(model_setting['aligner_args']))
+            self.aligners[modality_name] = AlignNet(model_setting['aligner_args'])
+
             if sensor_name == "camera":
                 camera_mask_args = model_setting['camera_mask_args']
                 setattr(self, f"crop_ratio_W_{modality_name}",
@@ -150,7 +145,7 @@ class HeterPyramidCollab(nn.Module):
 
     def forward(self, data_dict: Mapping):
         output_dict = {'pyramid': 'collab'}
-        agent_modality_list = data_dict['agent_modality_list']
+        agent_modality_list = data_dict['agent_modality_list']  # List[str]
         affine_matrix = normalize_pairwise_tfm(data_dict['pairwise_t_matrix'], self.H, self.W, self.fake_voxel_size)
         record_len = data_dict['record_len']
         # print(agent_modality_list)
@@ -168,11 +163,11 @@ class HeterPyramidCollab(nn.Module):
         for modality_name in self.modality_name_list:
             if modality_name not in modality_count_dict:
                 continue
-            feature = eval(f"self.encoder_{modality_name}")(data_dict, modality_name)
+            feature = self.encoders[modality_name](data_dict, modality_name)
             # 每个模态的 backbone 其实都是 ResNetBEVBackbone, 只不过设定上不一致罢了
-            feature = eval(f"self.backbone_{modality_name}")({"spatial_features": feature})['spatial_features_2d']
+            feature = self.backbones[modality_name]({"spatial_features": feature})['spatial_features_2d']
             # 在进行第一阶段的训练时, 其实是不需要对齐的, 根据配置文件生成的 `aligner_` 也是 nn.Identity()
-            feature = eval(f"self.aligner_{modality_name}")(feature)
+            feature = self.aligners[modality_name](feature)
             # 提取到每个模态的 feature, 并将其放到 `modality_feature_dict` 供下一步操作
             modality_feature_dict[modality_name] = feature
 

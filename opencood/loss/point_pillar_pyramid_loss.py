@@ -65,6 +65,11 @@ class PointPillarPyramidLoss(PointPillarDepthLoss):
         return total_loss
 
     def calc_occ_loss(self, occ_single_list, positives, negatives, batch_size):
+        """
+        这部分代码计算占用损失。首先，根据输入的正负样本标签生成占用正样本和负样本标签。
+        然后，遍历每个层级的占用预测，计算其与真实标签之间的损失。使用sigmoid_focal_loss计算损失，并根据金字塔的权重进行加权。
+        :return:
+        """
         total_occ_loss = 0
         occ_positives = torch.logical_or(positives[..., 0], positives[..., 1]).unsqueeze(-1).float()  # N, H, W
         occ_negatives = torch.logical_and(negatives[..., 0], negatives[..., 1]).unsqueeze(-1).float()  # N, H, W

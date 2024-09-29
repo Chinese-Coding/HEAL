@@ -14,6 +14,9 @@ class AlignNet(nn.Module):
         super().__init__()
         model_name = args['core_method']
         # TODO: 这里换成 map 的写法会不会更好?
+        """
+        边观配置文件, 发现只使用了 `convnext` 和 `identity` 这两种对齐方式居多
+        """
         if model_name == "scaligner":
             self.channel_align = SCAligner(args['args'])
         elif model_name == "resnet1x1":

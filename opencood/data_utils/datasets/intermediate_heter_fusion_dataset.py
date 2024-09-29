@@ -68,7 +68,7 @@ def getIntermediateheterFusionDataset(cls):
                 'supervise_single' in params['model']['args'] and params['model']['args']['supervise_single'] else False
             self.proj_first = False if 'proj_first' not in params['fusion']['args'] \
                 else params['fusion']['args']['proj_first']
-
+            self.batch_size = params["train_params"]["batch_size"]
             self.anchor_box = self.post_processor.generate_anchor_box()
             self.anchor_box_torch = torch.from_numpy(self.anchor_box)
 
@@ -283,6 +283,7 @@ def getIntermediateheterFusionDataset(cls):
             而中期融合融合的是 encoder 后的特征. 很明显不符合中期融合的概念.
             同时, 论文给出的图片上指出, 在 Message Transmission 阶段不止传递 Feature, 也传递 Pose, 也许这里传递的是 Pose?
             """
+            # print(idx)
             base_data_dict = self.retrieve_base_data(idx)
             base_data_dict = add_noise_data_dict(base_data_dict, self.params['noise_setting'])
 
@@ -559,6 +560,7 @@ def getIntermediateheterFusionDataset(cls):
             :param batch:
             :return:
             """
+            assert len(batch) == self.batch_size
             # Intermediate fusion is different the other two
             output_dict = {'ego': {}}
 

@@ -37,6 +37,7 @@ class BaseDataset(Dataset):
         self.generate_object_center = self.generate_object_center_lidar if self.label_type == "lidar" \
             else self.generate_object_center_camera
 
+        # TODO: 如果配置文件里没有则直接在这里加, 这可不是一个好习惯
         if "noise_setting" not in self.params:
             self.params['noise_setting'] = OrderedDict()
             self.params['noise_setting']['add_noise'] = False

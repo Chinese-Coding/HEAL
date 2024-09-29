@@ -71,12 +71,13 @@ def weighted_fuse(x, score, record_len, affine_matrix, align_corners):
         scores_in_ego = warp_affine_simple(split_score[b], t_matrix[i, :, :, :], (H, W), align_corners=align_corners)
         """
         对齐后的分数score_in_ego中，将值为0的部分填充为负无穷大，然后应用softmax函数进行归一化。
-        接着，将所有NaN值替换为0，确保数值稳定性。
+        接着，将所有NaN值替换为0，确保数值稳定性。, device=scores_in_ego.device
         """
-        scores_in_ego.masked_fill_(scores_in_ego == 0, -float('inf'))
+        # scores_in_ego.masked_fill_(scores_in_ego == 0, -float('inf'))
+        scores_in_ego = torch.masked_fill(scores_in_ego, scores_in_ego == 0, -float('inf'))
         scores_in_ego = torch.softmax(scores_in_ego, dim=0)
         scores_in_ego = torch.where(torch.isnan(scores_in_ego),
-                                    torch.zeros_like(scores_in_ego, device=scores_in_ego.device), scores_in_ego)
+                                    torch.zeros_like(scores_in_ego), scores_in_ego)
         """将特征图和归一化后的分数相乘，并沿第0维求和，得到融合后的特征图，存入out列表"""
         out.append(torch.sum(feature_in_ego * scores_in_ego, dim=0))
     out = torch.stack(out)
@@ -163,6 +164,12 @@ class PyramidFusion(ResNetBEVBackbone):
         for i in range(self.num_levels):
             occ_map = eval(f"self.single_head_{i}")(feature_list[i])  # [N, 1, H, W]
             occ_map_list.append(occ_map)
+            """
+            避免零值：Sigmoid 函数的输出范围是 (0, 1)。如果结果为0或非常接近0，在后续计算（例如除法或对数操作）中可能会导致问题。加入一个小的常数可以确保score不会恰好为零。
+            确保梯度：在反向传播过程中，如果score变为零，梯度可能会消失或变得非常小，从而导致学习速度变慢或完全停止。加入一个小的常数有助于保持非零梯度。
+            数值稳定性：在一些算法中，像归一化或softmax操作在处理非常小的值时可能会产生数值不稳定性。这个小常数可以通过确保所有值都是正数并远离零来帮助减轻这些问题。
+            防止边界情况：在 occ_map 有极端值的情况下，sigmoid函数可能会输出非常接近0或1的值。加入一个小常数可以防止这些边界情况在后续计算中引发问题。
+            """
             score = torch.sigmoid(occ_map) + 1e-4
 
             if crop_mask_flag and not self.training:
@@ -188,6 +195,7 @@ class PyramidFusion(ResNetBEVBackbone):
             # Foreground Map 融合的部分
             fused_feature_list.append(
                 weighted_fuse(feature_list[i], score, record_len, affine_matrix, self.align_corners))
-        fused_feature = self.decode_multiscale_feature(fused_feature_list) # fused_feature.shape = [4, 384, 128, 256] TODO: `4`? 三层 + 最后一层融合后的?
+        fused_feature = self.decode_multiscale_feature(
+            fused_feature_list)  # fused_feature.shape = [4, 384, 128, 256] TODO: `4`? 三层 + 最后一层融合后的?
 
         return fused_feature, occ_map_list

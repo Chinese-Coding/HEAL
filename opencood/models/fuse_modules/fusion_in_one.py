@@ -48,6 +48,7 @@ class ScaledDotProductAttention(nn.Module):
 
 def regroup(x, record_len):
     cum_sum_len = torch.cumsum(record_len, dim=0)
+    tmp = cum_sum_len[:-1].cpu()
     split_x = torch.tensor_split(x, cum_sum_len[:-1].cpu())
     return split_x
 

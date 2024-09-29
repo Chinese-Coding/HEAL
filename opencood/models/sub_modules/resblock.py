@@ -21,7 +21,7 @@ def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, d
     """3x3 convolution with padding"""
     # TODO: 参数 `padding` 和 `dilation` 为什么设置的值是一样的呢?
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=dilation, groups=groups, bias=False, ) # dilation=dilation
+                     padding=dilation, groups=groups, bias=False, )  # dilation=dilation
 
 
 def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
@@ -214,7 +214,7 @@ class ResNetModified(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _forward_impl(self, x: Tensor, return_interm: bool = True) -> Union[List[Tensor], Tensor]:
+    def _forward_impl(self, x: Tensor, return_interm=True) -> Union[List[Tensor], Tensor]:
         # See note [TorchScript super()]
         interm_features = []
         for i in range(self.layernum):

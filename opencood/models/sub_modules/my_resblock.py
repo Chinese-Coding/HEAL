@@ -112,8 +112,7 @@ class MyResNetModified(nn.Module):
         for i in range(self.layernum):
             self.__setattr__(f"layer{i}",
                              self._make_layer(block, num_filters[i], layers[i], stride=layer_strides[i],
-                                              dilate=replace_stride_with_dilation[i],
-                                              kernel_size=2 * i + 3))
+                                              dilate=replace_stride_with_dilation[i], kernel_size=2 * i + 3))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -131,7 +130,6 @@ class MyResNetModified(nn.Module):
                     stride: int = 1, dilate: bool = False, kernel_size=3) -> nn.Sequential:
         norm_layer = self._norm_layer
         downsample = None
-        previous_dilation = self.dilation
         if dilate:
             self.dilation *= stride
             stride = 1
@@ -155,8 +153,8 @@ class MyResNetModified(nn.Module):
     def _forward_impl(self, x: Tensor, return_interm: bool = True) -> Union[List[Tensor], Tensor]:
         interm_features = []
         for i in range(self.layernum):
-            x = eval(f"self.layer{i}")(x)
-            interm_features.append(x)
+            out = eval(f"self.layer{i}")(x)
+            interm_features.append(out)
         if return_interm:
             return interm_features
         return x
@@ -166,7 +164,7 @@ class MyResNetModified(nn.Module):
 
 
 if __name__ == "__main__":
-    model = MyResNetModified(MyBasicBlock, layers=[1, 1, 1], layer_strides=[1, 2, 3],
+    model = MyResNetModified(MyBasicBlock, layers=[1, 1, 1], layer_strides=[1, 1, 1],
                              num_filters=[64, 64, 64], groups=1, width_per_group=64)
     input = torch.randn(4, 64, 200, 704)
 
